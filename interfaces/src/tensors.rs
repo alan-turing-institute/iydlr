@@ -10,12 +10,12 @@ use crate::utils::{Exp, Ln, Pow};
 pub trait Tensor<E>:
     Debug
     + Clone
-    + Sized
-    + Iterator<Item = E>
-    + Add<Output = Self>
-    + Add<E, Output = Self>
-    + Mul<Output = Self>
-    + Mul<E, Output = Self>
+    //+ Sized
+    //+ Iterator<Item = E>
+    //+ Add<Output = Self>
+    //+ Add<E, Output = Self>
+    //+ Mul<Output = Self>
+    //+ Mul<E, Output = Self>
 where
     E: Element,
 {
@@ -25,21 +25,21 @@ where
 
     fn from_vec(shape: Vec<usize>, data: Vec<E>) -> Self;
 
-    /// Fill a matrix by repeatedly cloning the provided element.
-    /// Note: the behaviour might be unexpected if the provided element clones "by reference".
-    fn fill_with_clone(shape: Vec<usize>, element: E) -> Self;
+    ///// Fill a matrix by repeatedly cloning the provided element.
+    ///// Note: the behaviour might be unexpected if the provided element clones "by reference".
+    //fn fill_with_clone(shape: Vec<usize>, element: E) -> Self;
 
-    fn at(&self, idxs: Vec<usize>) -> Option<&E>;
+    //fn at(&self, idxs: Vec<usize>) -> Option<&E>;
 
-    fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
+    //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
 
-    fn transpose(self) -> Self;
+    //fn transpose(self) -> Self;
 
-    fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
+    //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
 
-    /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
-    /// vector")
-    fn dim_sum(&self, dim: Vec<usize>) -> Self;
+    ///// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
+    ///// vector")
+    //fn dim_sum(&self, dim: Vec<usize>) -> Self;
 }
 
 /// Collection of traits required by the elements of a Tensor.
@@ -58,9 +58,9 @@ where
     /// Softmax across one dimension, leaving shape unchanged
     fn softmax(&self, dim: usize) -> Self;
 
-    /// Fill a tensor with calls to `MathPrimitive::from_f64`
-    /// Note: May provide different behaviour to `Tensor::fill_with_clone` (eg. by creating "new"
-    /// primitives rather than cloning existing primitives).
+    // Fill a tensor with calls to `MathPrimitive::from_f64`
+    // Note: May provide different behaviour to `Tensor::fill_with_clone` (eg. by creating "new"
+    // primitives rather than cloning existing primitives).
     // TODO(mhauru): Come back to this later.
     // fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
 }
