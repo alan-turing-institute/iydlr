@@ -14,8 +14,8 @@ pub trait Tensor<E>:
     //+ Iterator<Item = E>
     + Add<Output = Self>
     + Add<E, Output = Self>
-    //+ Mul<Output = Self>
-    //+ Mul<E, Output = Self>
+    + Mul<Output = Self>
+    + Mul<E, Output = Self>
 where
     E: Element,
 {
