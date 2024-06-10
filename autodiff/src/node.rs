@@ -1,14 +1,6 @@
-// /// A node in a computation graph.
-// pub struct Node<T> {
-//     val: T,          // value
-//     grad: Option<T>, // gradient
-//     dep: Vec<Node>,  // dependencies
-// }
-
 use std::{
     fmt::Display,
-    ops::{self, Add, AddAssign, Div, Mul},
-    rc::Rc,
+    ops::{Add, AddAssign, Div, Mul},
 };
 
 use interfaces::{
@@ -19,11 +11,12 @@ use interfaces::{
 /// A node in a computation graph.
 #[derive(Debug, Clone)]
 pub enum Node<T> {
-    Sum(T, Option<T>, (Rc<Node<T>>, Rc<Node<T>>)),
-    Prod(T, Option<T>, (Rc<Node<T>>, Rc<Node<T>>)),
-    Exp(T, Option<T>, Rc<Node<T>>),
-    Ln(T, Option<T>, Rc<Node<T>>),
-    Pow(T, Option<T>, (Rc<Node<T>>, Rc<Node<T>>)),
+    // Use Box<Node<T>> not Rc<Node<T>> because we do not need multiple ownership.
+    Sum(T, Option<T>, (Box<Node<T>>, Box<Node<T>>)),
+    Prod(T, Option<T>, (Box<Node<T>>, Box<Node<T>>)),
+    Exp(T, Option<T>, Box<Node<T>>),
+    Ln(T, Option<T>, Box<Node<T>>),
+    Pow(T, Option<T>, (Box<Node<T>>, Box<Node<T>>)),
     Leaf(T, Option<T>),
 }
 
@@ -43,16 +36,39 @@ impl<T: Add> Node<T> {
         }
     }
 
-    pub fn grad(&self) -> Option<&T> {
+    pub fn grad(&self) -> &Option<T> {
         match self {
             Node::Sum(_, grad, _)
             | Node::Prod(_, grad, _)
             | Node::Exp(_, grad, _)
             | Node::Ln(_, grad, _)
             | Node::Pow(_, grad, _)
-            | Node::Leaf(_, grad) => grad.as_ref(),
+            | Node::Leaf(_, grad) => grad,
         }
     }
+
+    pub fn set_grad(&mut self, new_grad: T) {
+        let g = match self {
+            Node::Sum(_, grad, _)
+            | Node::Prod(_, grad, _)
+            | Node::Exp(_, grad, _)
+            | Node::Ln(_, grad, _)
+            | Node::Pow(_, grad, _)
+            | Node::Leaf(_, grad) => grad,
+        };
+
+        *g = Some(new_grad);
+    }
+
+    // // Propagate a given gradient on the `grad` of each associated Node.
+    // pub fn backward(&self, gradient: T) {
+    //     match self {
+    //         Node::Sum(val, grad, (n1, n2)) => {
+    //             *n1.grad().borrow_mut()
+    //         }
+    //         _ => todo!(),
+    //     }
+    // }
 }
 
 impl<T: RealElement> Add<Node<T>> for Node<T> {
@@ -116,7 +132,7 @@ impl<T: RealElement> Pow for Node<T> {
 
 impl<T: RealElement> AddAssign for Node<T> {
     fn add_assign(&mut self, _rhs: Self) {
-        todo!()
+        panic!("Unexpected call to AddAssign on a Node.")
     }
 }
 
@@ -137,7 +153,19 @@ mod tests {
     fn test_new() {
         let node = Node::<f64>::new(3.1, Some(0.4));
         assert_eq!(node.val(), &3.1_f64);
-        assert_eq!(node.grad(), Some(&0.4));
+        assert_eq!(node.grad(), &Some(0.4));
+    }
+
+    #[test]
+    fn test_set_grad() {
+        let mut node = Node::<f64>::new(3.1, None);
+        assert_eq!(node.val(), &3.1_f64);
+        assert_eq!(node.grad(), &None);
+
+        node.set_grad(0.4);
+
+        assert_eq!(node.val(), &3.1_f64);
+        assert_eq!(node.grad(), &Some(0.4));
     }
 
     #[test]
@@ -147,7 +175,7 @@ mod tests {
 
         let result = node1 + node2;
         assert_eq!(result.val(), &25.3_f64);
-        assert_eq!(result.grad(), None);
+        assert_eq!(result.grad(), &None);
     }
 
     #[test]
@@ -157,7 +185,7 @@ mod tests {
 
         let result = node1 * node2;
         assert_eq!(result.val(), &68.82_f64);
-        assert_eq!(result.grad(), None);
+        assert_eq!(result.grad(), &None);
     }
 
     #[test]
@@ -167,7 +195,7 @@ mod tests {
 
         let result = node1 / node2;
         assert_eq!(result.val(), &0.13963963963963966_f64);
-        assert_eq!(result.grad(), None);
+        assert_eq!(result.grad(), &None);
     }
 
     #[test]
@@ -186,12 +214,32 @@ mod tests {
 
         let result = node1.pow(node2);
         assert_eq!(result.val(), &80952376567.60643_f64);
-        assert_eq!(result.grad(), None);
+        assert_eq!(result.grad(), &None);
     }
 
     // #[test]
     // fn test_fmt() {
     //     let node = Node::<f64>::new(3.1, None);
     //     println!("{}", node);
+    // }
+
+    // #[test]
+    // fn test_backward() {
+    //     let node1 = Node::new(1.1, None);
+    //     let node2 = Node::new(2.2, None);
+
+    //     let ref1 = node1.clone();
+    //     let ref2 = node2.clone();
+
+    //     let node = node1 + node2;
+
+    //     assert_eq!(ref1.grad(), None);
+    //     assert_eq!(ref2.grad(), None);
+
+    //     node.backward(5.5);
+
+    //     // TODO:
+    //     assert_eq!(ref1.grad(), Some(&0.1));
+    //     assert_eq!(ref2.grad(), Some(&0.2));
     // }
 }
