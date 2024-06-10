@@ -66,12 +66,16 @@ impl<T: RealElement> ops::Mul<Node<T>> for Node<T> {
     type Output = Node<T>;
 
     fn mul(self, _rhs: Node<T>) -> Node<T> {
-        Node::Sum(
+        Node::Prod(
             self.val().clone() * _rhs.val().clone(),
             None,
             (self.into(), _rhs.into()),
         )
     }
+}
+
+impl RealElement for Node<T> {
+    
 }
 #[cfg(test)]
 mod tests {
