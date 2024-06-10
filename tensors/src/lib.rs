@@ -1,6 +1,9 @@
 use interfaces::tensors::{Element, Tensor};
-use std::vec::Vec;
-use std::fmt::Debug;
+use std::{
+    ops::Add,
+    vec::Vec,
+    fmt::Debug,
+};
 use anyhow::Error;
 
 #[derive(Debug, Clone)]
@@ -10,6 +13,28 @@ where
 {
     shape: Vec<usize>,
     data: Vec<E>,
+}
+
+impl<E> Add for TensorImpl<E>
+where
+    E: Element,
+{
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        if self.shape() != other.shape() {
+            panic!("Shapes are not compatible for addition");
+        }
+
+        let data = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
+            .map(|(a, b)| a.clone() + b.clone())
+            .collect();
+        TensorImpl::from_vec(self.shape(), data)
+    }
 }
 
 impl<E> Tensor<E> for TensorImpl<E>

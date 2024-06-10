@@ -12,7 +12,7 @@ pub trait Tensor<E>:
     + Clone
     //+ Sized
     //+ Iterator<Item = E>
-    //+ Add<Output = Self>
+    + Add<Output = Self>
     //+ Add<E, Output = Self>
     //+ Mul<Output = Self>
     //+ Mul<E, Output = Self>
