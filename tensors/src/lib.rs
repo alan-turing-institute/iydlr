@@ -15,9 +15,8 @@ where
     data: Vec<E>,
 }
 
-impl<E> Add for TensorImpl<E>
-where
-    E: Element,
+/// Adding to two tensors together.
+impl<E: Element> Add for TensorImpl<E>
 {
     type Output = Self;
 
@@ -37,6 +36,23 @@ where
         TensorImpl::from_vec(self.shape(), data).unwrap()
     }
 }
+
+/// Adding to a scalar to a tensors together.
+impl<E: Element> Add<E> for TensorImpl<E>
+{
+    type Output = Self;
+
+    fn add(self, scalar: E) -> Self {
+        let data = self
+            .data
+            .iter()
+            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
+            .map(|a| a.clone() + scalar.clone())
+            .collect();
+        TensorImpl::from_vec(self.shape(), data)
+    }
+}
+
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
