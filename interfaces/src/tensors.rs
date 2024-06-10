@@ -23,7 +23,7 @@ where
 
     fn shape(&self) -> Vec<usize>;
 
-    fn from_vec(shape: Vec<usize>, data: Vec<E>) -> Self;
+    fn from_vec(shape: Vec<usize>, data: Vec<E>) -> Result<Self, Self::TensorError>;
 
     ///// Fill a matrix by repeatedly cloning the provided element.
     ///// Note: the behaviour might be unexpected if the provided element clones "by reference".

@@ -33,7 +33,8 @@ where
             // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
             .map(|(a, b)| a.clone() + b.clone())
             .collect();
-        TensorImpl::from_vec(self.shape(), data)
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(self.shape(), data).unwrap()
     }
 }
 
@@ -43,8 +44,14 @@ where
 {
     type TensorError = Error;
 
-    fn from_vec(shape: Vec<usize>, data: Vec<E>) -> Self {
-        TensorImpl { shape, data }
+    fn from_vec(shape: Vec<usize>, data: Vec<E>) -> Result<Self, Self::TensorError> {
+        if shape.iter().product::<usize>() != data.len() {
+            return Err(Error::msg(
+                "The length of the `data` param does not match the values of the `shape` param",
+            ));
+        } else {
+            Ok(TensorImpl { shape, data })
+        }
     }
 
     fn shape(&self) -> Vec<usize> {
@@ -76,11 +83,29 @@ mod tests {
     fn test_from_vec() {
         let shape = vec![2, 3];
         let data = vec![1, 2, 3, 4, 5, 6];
-        let tensor = TensorImpl::from_vec(shape.clone(), data.clone());
+        let maybe_tensor = TensorImpl::from_vec(shape.clone(), data.clone());
+        let tensor = maybe_tensor.unwrap();
 
         assert_eq!(tensor.shape(), shape);
         assert_eq!(tensor.data, data);
     }
+
+    #[test]
+    fn test_from_vec_invalid_params() {
+        // The length of the `data` Vec is not that implied by the `shape` Vec
+        let shape = vec![2, 3];
+        let data = vec![1, 2];
+        let maybe_tensor = TensorImpl::from_vec(shape.clone(), data.clone());
+        assert!(maybe_tensor.is_err());
+        let err = maybe_tensor.unwrap_err();
+
+        assert!(
+            err.to_string().contains(
+                "The length of the `data` param does not match the values of the `shape` param"
+            )
+        );
+    }
+
 
     #[test]
     fn test_shape() {
@@ -88,6 +113,6 @@ mod tests {
         let data = vec![1, 2, 3, 4, 5, 6];
         let tensor = TensorImpl::from_vec(shape.clone(), data);
 
-        assert_eq!(tensor.shape(), shape);
+        assert_eq!(tensor.unwrap().shape(), shape);
     }
 }
