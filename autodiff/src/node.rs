@@ -6,7 +6,7 @@
 // }
 
 use std::{
-    ops::{self, Add},
+    ops::{self, Add, AddAssign, Div, Mul},
     rc::Rc,
 };
 
@@ -50,7 +50,7 @@ impl<T: Add> Node<T> {
     }
 }
 
-impl<T: RealElement> ops::Add<Node<T>> for Node<T> {
+impl<T: RealElement> Add<Node<T>> for Node<T> {
     type Output = Node<T>;
 
     fn add(self, _rhs: Node<T>) -> Node<T> {
@@ -62,7 +62,7 @@ impl<T: RealElement> ops::Add<Node<T>> for Node<T> {
     }
 }
 
-impl<T: RealElement> ops::Mul<Node<T>> for Node<T> {
+impl<T: RealElement> Mul<Node<T>> for Node<T> {
     type Output = Node<T>;
 
     fn mul(self, _rhs: Node<T>) -> Node<T> {
@@ -74,9 +74,21 @@ impl<T: RealElement> ops::Mul<Node<T>> for Node<T> {
     }
 }
 
-impl RealElement for Node<T> {
-    
+impl<T: RealElement> Div<Node<T>> for Node<T> {
+    type Output = Node<T>;
+
+    fn div(self, _rhs: Node<T>) -> Node<T> {
+        // Same division by zero rules as standard division operator.
+        Node::Prod(
+            self.val().clone() / _rhs.val().clone(),
+            None,
+            (self.into(), _rhs.into()),
+        )
+    }
 }
+
+// impl RealElement for Node<T> {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +118,24 @@ mod tests {
         let result = node1 * node2;
         assert_eq!(result.val(), &68.82_f64);
         assert_eq!(result.grad(), None);
+    }
+
+    #[test]
+    fn test_div() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
+
+        let result = node1 / node2;
+        assert_eq!(result.val(), &0.13963963963963966_f64);
+        assert_eq!(result.grad(), None);
+    }
+
+    #[test]
+    fn test_div_by_zero() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(0.0, None);
+
+        let result = node1 / node2;
+        assert_eq!(result.val(), &f64::INFINITY);
     }
 }
