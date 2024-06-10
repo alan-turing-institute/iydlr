@@ -62,6 +62,17 @@ impl<T: RealElement> ops::Add<Node<T>> for Node<T> {
     }
 }
 
+impl<T: RealElement> ops::Mul<Node<T>> for Node<T> {
+    type Output = Node<T>;
+
+    fn mul(self, _rhs: Node<T>) -> Node<T> {
+        Node::Sum(
+            self.val().clone() * _rhs.val().clone(),
+            None,
+            (self.into(), _rhs.into()),
+        )
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,6 +91,16 @@ mod tests {
 
         let result = node1 + node2;
         assert_eq!(result.val(), &25.3_f64);
+        assert_eq!(result.grad(), None);
+    }
+
+    #[test]
+    fn test_mul() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
+
+        let result = node1 * node2;
+        assert_eq!(result.val(), &68.82_f64);
         assert_eq!(result.grad(), None);
     }
 }
