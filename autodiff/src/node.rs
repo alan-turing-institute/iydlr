@@ -6,16 +6,18 @@
 // }
 
 use std::{
+    fmt::Display,
     ops::{self, Add, AddAssign, Div, Mul},
     rc::Rc,
 };
 
 use interfaces::{
-    tensors::RealElement,
+    tensors::{Element, RealElement},
     utils::{Exp, Ln, Pow},
 };
 
 /// A node in a computation graph.
+#[derive(Debug, Clone)]
 pub enum Node<T> {
     Sum(T, Option<T>, (Rc<Node<T>>, Rc<Node<T>>)),
     Prod(T, Option<T>, (Rc<Node<T>>, Rc<Node<T>>)),
@@ -112,7 +114,20 @@ impl<T: RealElement> Pow for Node<T> {
     }
 }
 
-// impl<T: RealElement> RealElement for Node<T> {}
+impl<T: RealElement> AddAssign for Node<T> {
+    fn add_assign(&mut self, _rhs: Self) {
+        todo!()
+    }
+}
+
+impl<T: RealElement> Display for Node<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Node: {:?}", self)
+    }
+}
+
+impl<T: RealElement> Element for Node<T> {}
+impl<T: RealElement> RealElement for Node<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -173,4 +188,10 @@ mod tests {
         assert_eq!(result.val(), &80952376567.60643_f64);
         assert_eq!(result.grad(), None);
     }
+
+    // #[test]
+    // fn test_fmt() {
+    //     let node = Node::<f64>::new(3.1, None);
+    //     println!("{}", node);
+    // }
 }
