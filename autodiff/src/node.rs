@@ -12,7 +12,7 @@ use std::{
 
 use interfaces::{
     tensors::RealElement,
-    utils::{Exp, Ln},
+    utils::{Exp, Ln, Pow},
 };
 
 /// A node in a computation graph.
@@ -102,7 +102,17 @@ impl<T: RealElement> Ln for Node<T> {
     }
 }
 
-// impl RealElement for Node<T> {}
+impl<T: RealElement> Pow for Node<T> {
+    fn pow(self, exp: Node<T>) -> Node<T> {
+        Node::Pow(
+            self.val().clone().pow(exp.val().clone()), // Note: unnecessary clone of exp.val() here?
+            None,
+            (self.into(), exp.into()),
+        )
+    }
+}
+
+// impl<T: RealElement> RealElement for Node<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -152,5 +162,15 @@ mod tests {
 
         let result = node1 / node2;
         assert_eq!(result.val(), &f64::INFINITY);
+    }
+
+    #[test]
+    fn test_pow() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
+
+        let result = node1.pow(node2);
+        assert_eq!(result.val(), &80952376567.60643_f64);
+        assert_eq!(result.grad(), None);
     }
 }
