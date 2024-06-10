@@ -3,6 +3,11 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign},
 };
 
+use interfaces::{
+    tensors::{Element, RealElement},
+    utils::{Exp, Ln, Pow},
+};
+
 #[derive(Debug, Clone, Copy)]
 pub struct DualNumber {
     pub real: f64,
@@ -73,6 +78,35 @@ impl DivAssign for DualNumber {
     }
 }
 
+// f(a + be) = f(a) + f'(a)be
+impl Exp for DualNumber {
+    fn exp(self) -> Self {
+        let real = self.real.exp();
+        let dual = self.dual * self.real.exp();
+        Self::new(real, dual)
+    }
+}
+
+impl Ln for DualNumber {
+    fn ln(self) -> Self {
+        let real = self.real.ln();
+        let dual = self.dual / self.real;
+        Self::new(real, dual)
+    }
+}
+
+impl Pow for DualNumber {
+    fn pow(self, exp: Self) -> Self {
+        let real = self.real.powf(exp.real);
+        let dual = real * (exp.dual * self.real.ln() + exp.real * self.dual / self.real);
+        Self::new(real, dual)
+    }
+}
+
+impl Element for DualNumber {}
+
+impl RealElement for DualNumber {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,7 +121,7 @@ mod tests {
     }
 
     fn cube(dual_number: DualNumber) -> DualNumber {
-        dual_number * dual_number * dual_number
+        dual_number.pow(DualNumber::new(3., 0.))
     }
 
     #[test]

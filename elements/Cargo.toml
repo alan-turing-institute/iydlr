@@ -4,3 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+interfaces = { version = "0.1.0", path = "../interfaces" }
