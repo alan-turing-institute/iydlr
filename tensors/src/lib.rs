@@ -83,7 +83,9 @@ where
 
     //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
 
-    //fn transpose(self) -> Self;
+    fn transpose(self) -> Self {
+        todo!()
+    }
 
     //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
 
@@ -132,4 +134,24 @@ mod tests {
 
         assert_eq!(tensor.unwrap().shape(), shape);
     }
+
+    #[test]
+    fn test_transpose() {
+        let shape = vec![2, 3];
+        let data = vec![1, 2, 3, 4, 5, 6];
+        let tensor = TensorImpl::from_vec(shape.clone(), data).unwrap();
+        let transposed = tensor.transpose();
+        assert_eq!(transposed.shape(), vec![3, 2]);
+
+        let shape = vec![2, 2];
+        let original_data = vec![1, 2, 3, 4];
+        let tensor = TensorImpl::from_vec(shape.clone(), original_data).unwrap();
+        let transposed = tensor.transpose();
+        assert_eq!(transposed.shape(), vec![2, 2]);
+
+        let expected_data = vec![1, 3, 2, 4];
+        assert_eq!(transposed.data, expected_data);
+
+    }
+
 }
