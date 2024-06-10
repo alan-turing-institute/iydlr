@@ -10,7 +10,10 @@ use std::{
     rc::Rc,
 };
 
-use interfaces::tensors::RealElement;
+use interfaces::{
+    tensors::RealElement,
+    utils::{Exp, Ln},
+};
 
 /// A node in a computation graph.
 pub enum Node<T> {
@@ -84,6 +87,18 @@ impl<T: RealElement> Div<Node<T>> for Node<T> {
             None,
             (self.into(), _rhs.into()),
         )
+    }
+}
+
+impl<T: RealElement> Exp for Node<T> {
+    fn exp(self) -> Self {
+        Node::Exp(self.val().clone().exp(), None, self.into())
+    }
+}
+
+impl<T: RealElement> Ln for Node<T> {
+    fn ln(self) -> Self {
+        Node::Exp(self.val().clone().ln(), None, self.into())
     }
 }
 
