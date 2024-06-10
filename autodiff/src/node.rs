@@ -5,7 +5,12 @@
 //     dep: Vec<Node>,  // dependencies
 // }
 
-use std::rc::Rc;
+use std::{
+    ops::{self, Add},
+    rc::Rc,
+};
+
+use interfaces::tensors::RealElement;
 
 /// A node in a computation graph.
 pub enum Node<T> {
@@ -17,7 +22,7 @@ pub enum Node<T> {
     Leaf(T, Option<T>),
 }
 
-impl<T> Node<T> {
+impl<T: Add> Node<T> {
     pub fn new(val: T, grad: Option<T>) -> Self {
         Node::Leaf(val, grad)
     }
@@ -45,6 +50,18 @@ impl<T> Node<T> {
     }
 }
 
+impl<T: RealElement> ops::Add<Node<T>> for Node<T> {
+    type Output = Node<T>;
+
+    fn add(self, _rhs: Node<T>) -> Node<T> {
+        Node::Sum(
+            self.val().clone() + _rhs.val().clone(),
+            None,
+            (self.into(), _rhs.into()),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -54,5 +71,15 @@ mod tests {
         let node = Node::<f64>::new(3.1, Some(0.4));
         assert_eq!(node.val(), &3.1_f64);
         assert_eq!(node.grad(), Some(&0.4));
+    }
+
+    #[test]
+    fn test_add() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
+
+        let result = node1 + node2;
+        assert_eq!(result.val(), &25.3_f64);
+        assert_eq!(result.grad(), None);
     }
 }
