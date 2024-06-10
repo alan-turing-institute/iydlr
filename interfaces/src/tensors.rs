@@ -33,7 +33,7 @@ where
 
     //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
 
-    fn transpose(self) -> Self;
+    fn transpose(&self) -> Self;
 
     //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
 
