@@ -49,7 +49,8 @@ impl<E: Element> Add<E> for TensorImpl<E>
             // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
             .map(|a| a.clone() + scalar.clone())
             .collect();
-        TensorImpl::from_vec(self.shape(), data)
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(self.shape(), data).unwrap()
     }
 }
 
