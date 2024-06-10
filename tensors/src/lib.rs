@@ -1,10 +1,6 @@
-use interfaces::tensors::{Element, Tensor};
-use std::{
-    ops::Add,
-    vec::Vec,
-    fmt::Debug,
-};
 use anyhow::Error;
+use interfaces::tensors::{Element, Tensor};
+use std::{fmt::Debug, ops::Add, vec::Vec};
 
 #[derive(Debug, Clone)]
 struct TensorImpl<E>
@@ -16,8 +12,7 @@ where
 }
 
 /// Adding to two tensors together.
-impl<E: Element> Add for TensorImpl<E>
-{
+impl<E: Element> Add for TensorImpl<E> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -38,8 +33,7 @@ impl<E: Element> Add for TensorImpl<E>
 }
 
 /// Adding to a scalar to a tensors together.
-impl<E: Element> Add<E> for TensorImpl<E>
-{
+impl<E: Element> Add<E> for TensorImpl<E> {
     type Output = Self;
 
     fn add(self, scalar: E) -> Self {
@@ -53,7 +47,6 @@ impl<E: Element> Add<E> for TensorImpl<E>
         TensorImpl::from_vec(self.shape(), data).unwrap()
     }
 }
-
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
@@ -116,13 +109,10 @@ mod tests {
         assert!(maybe_tensor.is_err());
         let err = maybe_tensor.unwrap_err();
 
-        assert!(
-            err.to_string().contains(
-                "The length of the `data` param does not match the values of the `shape` param"
-            )
-        );
+        assert!(err.to_string().contains(
+            "The length of the `data` param does not match the values of the `shape` param"
+        ));
     }
-
 
     #[test]
     fn test_shape() {
@@ -131,5 +121,39 @@ mod tests {
         let tensor = TensorImpl::from_vec(shape.clone(), data);
 
         assert_eq!(tensor.unwrap().shape(), shape);
+    }
+
+    #[test]
+    fn test_adding_tensors() {
+        let shape = vec![2, 3];
+        let data1 = vec![1, 2, 3, 4, 5, 6];
+        let data2 = vec![10, 20, 30, 40, 50, 60];
+        let tensor1 = TensorImpl::from_vec(shape.clone(), data1).unwrap();
+        let tensor2 = TensorImpl::from_vec(shape.clone(), data2).unwrap();
+
+        let tensor3 = tensor1 + tensor2;
+        assert_eq!(tensor3.data, vec![11, 22, 33, 44, 55, 66]);
+    }
+
+    #[test]
+    fn test_adding_tensors_wrong_shapes() {
+        let shape1 = vec![2, 3];
+        let shape2 = vec![2, 2];
+        let data1 = vec![1, 2, 3, 4, 5, 6];
+        let data2 = vec![10, 20, 30, 40];
+        let tensor1 = TensorImpl::from_vec(shape1.clone(), data1).unwrap();
+        let tensor2 = TensorImpl::from_vec(shape2.clone(), data2).unwrap();
+
+        assert!(std::panic::catch_unwind(|| tensor1 + tensor2).is_err());
+    }
+
+    #[test]
+    fn test_adding_tensors_and_scalars() {
+        let shape = vec![2, 3];
+        let data = vec![1, 2, 3, 4, 5, 6];
+        let tensor = TensorImpl::from_vec(shape.clone(), data).unwrap();
+
+        let tensor2 = tensor + 10;
+        assert_eq!(tensor2.data, vec![11, 12, 13, 14, 15, 16]);
     }
 }
