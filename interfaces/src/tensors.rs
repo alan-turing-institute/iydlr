@@ -29,9 +29,9 @@ where
     ///// Note: the behaviour might be unexpected if the provided element clones "by reference".
     //fn fill_with_clone(shape: Vec<usize>, element: E) -> Self;
 
-    //fn at(&self, idxs: Vec<usize>) -> Option<&E>;
+    fn at(&self, idxs: Vec<usize>) -> Option<&E>;
 
-    //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
+    fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
 
     fn transpose(&self) -> Self;
 
