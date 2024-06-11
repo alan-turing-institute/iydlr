@@ -14,7 +14,7 @@ pub trait Tensor<E>:
     + PartialEq
     + Clone
     //+ Sized
-    //+ Iterator<Item = E>
+    + IntoIterator<Item = E>
     + Add<Output = Self>
     + Add<E, Output = Self>
     + Mul<Output = Self>
