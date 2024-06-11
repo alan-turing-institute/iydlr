@@ -16,11 +16,48 @@ where
     data: Vec<E>,
 }
 
-// impl<E> From<usize> for TensorImpl<E> {
-//     fn from(value: usize) -> Self {
-//         todo!()
-//     }
-// }
+fn strides_from_shape(shape: &Vec<usize>) -> Vec<usize> {
+    let mut strides = vec![1];
+    for i in 0..(shape.len() - 1) {
+        strides.push(strides[i] * shape[shape.len() - 1 - i]);
+    }
+    return strides.into_iter().rev().collect();
+}
+
+fn num_elements_from_shape(shape: &Vec<usize>) -> usize {
+    return shape.iter().product::<usize>();
+}
+
+impl<E: Element> TensorImpl<E> {
+    fn strides(&self) -> Vec<usize> {
+        return strides_from_shape(&self.shape);
+    }
+
+    fn num_dims(&self) -> usize {
+        return self.shape.len();
+    }
+
+    fn num_elements(&self) -> usize {
+        return self.data.len();
+    }
+
+    fn vec_indx(&self, idxs: Vec<usize>) -> usize {
+        let s = self.strides();
+        return idxs
+            .iter()
+            .zip(s.iter())
+            .fold(0, |acc, (idx, stride)| acc + idx * stride);
+    }
+
+    // TODO(mhauru) This should return something like a view, which references the same data but is
+    // a new object. I don't know how to do that though.
+    //fn reshape(&mut self, new_shape: Vec<usize>) {
+    //    if self.num_elements() != num_elements_from_shape(&new_shape) {
+    //        panic!("The number of elements in the new shape does not match the number of elements in the original shape.");
+    //    }
+    //    self.shape = new_shape;
+    //}
+}
 
 /// Adding to two tensors together.
 impl<E: Element> Add for TensorImpl<E> {
@@ -103,7 +140,7 @@ where
     type TensorError = Error;
 
     fn from_vec(shape: &Vec<usize>, data: &Vec<E>) -> Result<Self, Self::TensorError> {
-        if shape.iter().product::<usize>() != data.len() {
+        if num_elements_from_shape(shape) != data.len() {
             return Err(Error::msg(
                 "The length of the `data` param does not match the values of the `shape` param",
             ));
@@ -119,47 +156,108 @@ where
         self.shape.clone()
     }
 
-    ///// Fill a matrix by repeatedly cloning the provided element.
-    ///// Note: the behaviour might be unexpected if the provided element clones "by reference".
-    //fn fill_with_clone(shape: Vec<usize>, element: E) -> Self {}
+    /// Fill a matrix by repeatedly cloning the provided element.
+    /// Note: the behaviour might be unexpected if the provided element clones "by reference".
+    fn fill_with_clone(shape: Vec<usize>, element: E) -> Self {
+        todo!()
+    }
 
-    //fn at(&self, idxs: Vec<usize>) -> Option<&E>;
+    fn at(&self, idxs: Vec<usize>) -> Option<&E> {
+        return self.data.get(self.vec_indx(idxs));
+    }
 
-    //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
+    fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E> {
+        let index = self.vec_indx(idxs);
+        return self.data.get_mut(index);
+    }
 
     fn transpose(&self) -> Self {
         if self.shape.len() < 2 {
             return self.clone();
         }
-        let mut shape = self.shape.clone();
-        let num_dims = shape.len();
+        let mut new_shape = self.shape.clone();
+        let num_dims = self.num_dims();
         // Swap the last two elements of the shape vector
-        shape.swap(num_dims - 1, num_dims - 2);
-        let leading_dims = shape
+        new_shape.swap(num_dims - 1, num_dims - 2);
+        // Compute the product of all the dimensions _not_ being transposed.
+        let lead_dim = new_shape
             .iter()
             .take(num_dims - 2)
             .into_iter()
             .product::<usize>();
 
-        let n_elements = self.data.len();
-        let mut data: Vec<E> = Vec::with_capacity(n_elements);
-        for i in 0..leading_dims {
-            for j in 0..shape[num_dims - 2] {
-                for k in 0..shape[num_dims - 1] {
+        // Create an unallocated data vector the same size as the original.
+        let n_elements = self.num_elements();
+        let mut new_data: Vec<E> = Vec::with_capacity(n_elements);
+
+        // Loop over the elements in the order of new_data.
+        let strides = self.strides();
+        dbg!(&self.shape);
+        dbg!(&strides);
+        let lead_stride = strides[num_dims - 2] * strides[num_dims - 1];
+        dbg!(lead_stride);
+        for i in 0..lead_dim {
+            for j in 0..new_shape[num_dims - 2] {
+                for k in 0..new_shape[num_dims - 1] {
+                    // Find the data index of this element in the original matrix.
+                    // Note the reversal of the roles of k an j.
                     let transposed_idx =
-                        i * shape[num_dims - 1] * shape[num_dims - 2] + k * shape[num_dims - 2] + j;
-                    data.push(self.data[transposed_idx].clone());
+                        i * lead_stride + k * strides[num_dims - 2] + j * strides[num_dims - 1];
+                    dbg!(&transposed_idx);
+                    new_data.push(self.data[transposed_idx].clone());
                 }
             }
         }
-        return TensorImpl { shape, data };
+        return TensorImpl {
+            shape: new_shape,
+            data: new_data,
+        };
     }
 
-    //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
+    fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError> {
+        todo!()
+    }
 
-    ///// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
+    /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
+    /// vector")
+    fn dim_sum(&self, dims: Vec<usize>) -> Self {
+        unimplemented!()
+    }
+}
+
+impl<E> TensorImpl<E>
+where
+    E: Element,
+{
+    ///// Sum across a single dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     ///// vector")
-    //fn dim_sum(&self, dim: Vec<usize>) -> Self;
+    fn single_dim_sum(&self, dim: usize) -> Self {
+        if dim >= self.shape.len() {
+            panic!("The provided dimension is out of bounds.");
+        }
+
+        let leading_dims = self.shape.iter().take(dim).into_iter().product::<usize>();
+        let trailing_dims = self
+            .shape
+            .iter()
+            .skip(dim + 1)
+            .into_iter()
+            .product::<usize>();
+
+        // let mut sum = E::zero();
+
+        // for i in 0..self.shape.len() {
+        //     let include_dim: bool = i == dim;
+        //     println!("i: {}", i, );
+
+        //     for j in 0..self.shape[dim] {
+        //         let idx = leading_dims * self.shape[dim] * trailing_dims + j * trailing_dims;
+        //         sum += self.data[idx].clone();
+        //     }
+        // }
+
+        todo!()
+    }
 }
 
 #[cfg(test)]
@@ -219,6 +317,10 @@ mod tests {
         let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
         let transposed1 = tensor1.transpose();
         assert_eq!(transposed1.shape(), vec![3, 2]);
+        // Transposing twice should return the original tensor
+        let transposed_twice1 = transposed1.transpose();
+        assert_eq!(transposed_twice1.shape(), shape1);
+        assert_eq!(transposed_twice1.data, data1);
 
         // Case 2
         let shape2 = vec![2, 2];
@@ -318,5 +420,22 @@ mod tests {
 
         let tensor2 = tensor * 10;
         assert_eq!(tensor2.data, vec![10, 20, 30, 40, 50, 60]);
+    }
+
+    #[test]
+    fn test_single_dim_sum() {
+        let shape = vec![2, 2];
+        let data = vec![1, 2, 3, 4];
+
+        let expected_row_sum = vec![1, 5];
+        let expected_col_sum = vec![2, 4];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+
+        // TODO confirm that `dim=0` is the correct index for row-wise sum
+        let actual_row_sum = tensor.single_dim_sum(0);
+        assert_eq!(actual_row_sum.data, expected_row_sum);
+
+        let actual_col_sum = tensor.single_dim_sum(1);
+        assert_eq!(actual_col_sum.data, expected_col_sum);
     }
 }
