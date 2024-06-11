@@ -1,5 +1,6 @@
 use anyhow::Error;
-use interfaces::tensors::{Element, Tensor};
+use interfaces::tensors::{Element, RealElement, RealTensor, Tensor};
+use interfaces::utils::{Exp, Ln, Pow};
 use std::{
     fmt::Debug,
     ops::{Add, Mul},
@@ -333,6 +334,7 @@ where
             .product::<usize>();
 
         println!("leading_dims: {}", leading_dims);
+        println!("self.shape[dim]: {}", self.shape[dim]);
         println!("trailing_dims: {}", trailing_dims);
 
         let mut output_shape  = self.shape.clone();
@@ -342,22 +344,59 @@ where
         let mut dim_sum: Vec<E> = Vec::new();
         
         // Outer loop needs to iterate over the size of the new shape
-        for i in 0..output_size {
-            let mut sum: E = E::zero();
-            for (j, value) in self.data.iter().enumerate() {
-                // print value of i, j and value
-                if j % self.shape[dim] == i {
-                    sum += value.clone();
+        for lead_idx in 0..leading_dims{
+            for trail_idx in 0..trailing_dims {
+                let mut sum: E = E::zero();
+                for summing_idx in 0..self.shape[dim] {
+                    let idx =  lead_idx * self.shape[dim] * trailing_dims 
+                                    + summing_idx * trailing_dims + trail_idx;
+                    // let idx = summing_idx + lead_idx + (trail_idx * leading_dims);
+
+                    // sum += original[lead_idx,summing_idx,trail_idx]
+                    sum += self.data[idx].clone();
                 }
-                println!("i: {}, j: {}, value: {}, sum: {}", i, j, value, sum);
+                // for (j, value) in self.data.iter().enumerate() {
+                //     // print value of i, j and value
+                //     let a = j % leading_dims;
+                //     let b = j % trailing_dims;
+
+                //     if j % self.shape[dim] == trail_idx {
+                //         sum += value.clone();
+                //     }
+                //     println!("i: {}, j: {}, a: {}, b: {}, value: {}, sum: {}", trail_idx, j, a, b, value, sum);
+                // }
+                dim_sum.push(sum);
             }
-            dim_sum.push(sum);
         }
 
         TensorImpl {
             shape: output_shape,
             data: dim_sum,
         }
+    }
+}
+
+impl<E: RealElement> Exp for TensorImpl<E> {
+    fn exp(self) -> Self{
+        todo!()
+    }
+}
+
+impl<E: RealElement> Pow<E> for TensorImpl<E> {
+    fn pow(self, exp: E) -> Self{
+        todo!()
+    }
+}
+
+impl<E: RealElement> Ln for TensorImpl<E> {
+    fn ln(self) -> Self{
+        todo!()
+    }
+}
+
+impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
+    fn softmax(&self, dim: usize) -> Self {
+        todo!()
     }
 }
 
@@ -551,19 +590,26 @@ mod tests {
 
     #[test]
     fn test_single_dim_sum() {
-        let shape = vec![2, 2];
-        let data = vec![1, 2, 3, 4];
+        let shape = vec![2, 2, 2];
+        let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
-        let expected_col_sum = vec![2, 4];
-        let expected_col_shape = vec![1, 2]; 
-        let actual_col_sum = tensor.single_dim_sum(0);
+        let expected_depth_sum = vec![6, 8, 10, 12];
+        let expected_depth_shape = vec![1, 2, 2]; 
+        let actual_depth_sum = tensor.single_dim_sum(0);
+        assert_eq!(actual_depth_sum.data, expected_depth_sum);
+        assert_eq!(actual_depth_sum.shape, expected_depth_shape);
+
+
+        let expected_col_sum = vec![4, 6, 12, 14];
+        let expected_col_shape = vec![2, 1, 2]; 
+        let actual_col_sum = tensor.single_dim_sum(1);
         assert_eq!(actual_col_sum.data, expected_col_sum);
         assert_eq!(actual_col_sum.shape, expected_col_shape);
 
-        let expected_row_sum = vec![1, 5];
-        let expected_row_shape = vec![2, 1]; 
-        let actual_row_sum = tensor.single_dim_sum(1);
+        let expected_row_sum = vec![3, 7, 11, 15];
+        let expected_row_shape = vec![2, 2, 1]; 
+        let actual_row_sum = tensor.single_dim_sum(2);
         assert_eq!(actual_row_sum.data, expected_row_sum);
         assert_eq!(actual_row_sum.shape, expected_row_shape);
     }
