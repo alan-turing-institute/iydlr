@@ -131,6 +131,21 @@ impl<E: Element> TensorImpl<E> {
     }
 }
 
+impl<E: Element> IntoIterator for TensorImpl<E> {
+    type Item = E;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> std::vec::IntoIter<Self::Item> {
+        self.data.into_iter()
+    }
+}
+
+impl<E: Element> From<TensorImpl<E>> for Vec<E> {
+    fn from(value: TensorImpl<E>) -> Self {
+        value.data.into_iter().collect()
+    }
+}
+
 /// Adding to two tensors together.
 impl<E: Element> Add for TensorImpl<E> {
     type Output = Self;
@@ -231,7 +246,8 @@ where
     /// Fill a matrix by repeatedly cloning the provided element.
     /// Note: the behaviour might be unexpected if the provided element clones "by reference".
     fn fill_with_clone(shape: Vec<usize>, element: E) -> Self {
-        todo!()
+        let data = vec![element; num_elements_from_shape(&shape)];
+        TensorImpl { shape, data }
     }
 
     fn at(&self, idxs: Vec<usize>) -> Option<&E> {
@@ -621,5 +637,30 @@ mod tests {
         let result = tensor1.matmul(&tensor2).unwrap();
         let shape_expected = vec![5, 4, 3, 6];
         assert_eq!(result.shape, shape_expected);
+    }
+
+    #[test]
+    fn test_fill_with_clone() {
+        let shape = vec![2, 3];
+        let element = 10;
+        let tensor = TensorImpl::fill_with_clone(shape, element);
+
+        assert_eq!(tensor.data, vec![10, 10, 10, 10, 10, 10]);
+    }
+
+    #[test]
+    fn test_into_iter() {
+        let shape = vec![2, 3];
+        let data = vec![1, 2, 3, 4, 5, 6];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        assert_eq!(tensor.into_iter().collect::<Vec<i32>>(), data);
+    }
+
+    #[test]
+    fn test_to_vec() {
+        let shape = vec![2, 3];
+        let data = vec![1, 2, 3, 4, 5, 6];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        assert_eq!(Vec::<i32>::from(tensor), data);
     }
 }
