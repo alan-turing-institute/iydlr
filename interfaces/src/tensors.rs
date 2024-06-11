@@ -67,7 +67,7 @@ where
     // Note: May provide different behaviour to `Tensor::fill_with_clone` (eg. by creating "new"
     // primitives rather than cloning existing primitives).
     // TODO(mhauru): Come back to this later.
-    // fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
+    fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
 }
 
 /// A Subtrait of `Element`, extending the trait to capture "real number like" behaviour.

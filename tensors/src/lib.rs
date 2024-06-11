@@ -398,6 +398,10 @@ impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
         todo!()
     }
+
+    fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
+        todo!()
+    }
 }
 
 #[cfg(test)]
