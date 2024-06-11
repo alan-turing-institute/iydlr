@@ -105,7 +105,20 @@ impl Pow for DualNumber {
 
 impl Element for DualNumber {}
 
-impl RealElement for DualNumber {}
+impl RealElement for DualNumber {
+    fn neg_inf() -> Self {
+        Self::new(-f64::INFINITY, 0.)
+    }
+    fn zero() -> Self {
+        Self::new(0., 0.)
+    }
+}
+
+impl From<f64> for DualNumber {
+    fn from(value: f64) -> Self {
+        Self::new(value, 0.)
+    }
+}
 
 #[cfg(test)]
 mod tests {
