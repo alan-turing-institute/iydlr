@@ -78,6 +78,7 @@ impl<T: RealElement + From<f64>> Node<T> {
         let self_val = self.val().clone();
         let self_grad = <Option<T> as Clone>::clone(&self.grad()).unwrap();
 
+        // TODO: check all these: why is there a factor self_grad in Sum & Prod but not elsewhere?
         match self {
             Node::Sum(_, _, (ref mut n1, ref mut n2)) => {
                 n1.set_grad(self_grad.to_owned());
@@ -291,6 +292,7 @@ mod tests {
 
         let node = node1 + node2;
 
+        assert!(node.grad().is_none());
         match &node {
             Node::Sum(_, _, (n1, n2)) => {
                 assert!(n1.grad().is_none());
@@ -301,6 +303,8 @@ mod tests {
 
         let node = node.backward(5.0);
 
+        assert!(node.grad().is_some());
+        assert_eq!(node.grad().unwrap(), 5.0_f64);
         match &node {
             Node::Sum(_, _, (n1, n2)) => {
                 assert!(n1.grad().is_some());
