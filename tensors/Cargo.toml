@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 interfaces = {path = "../interfaces"}
+
+[dev-dependencies]
+rand = "0.8.5"

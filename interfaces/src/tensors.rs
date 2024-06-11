@@ -1,7 +1,9 @@
 use std::{
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul},
+    cmp::{PartialEq},
 };
+use num::traits::Zero;
 
 use crate::utils::{Exp, Ln, Pow};
 
@@ -9,16 +11,15 @@ use crate::utils::{Exp, Ln, Pow};
 /// The element type must be an implementer of `Element`.
 pub trait Tensor<E>:
     Debug
+    + PartialEq
     + Clone
     //+ Sized
-    //+ Iterator<Item = E>
+    + IntoIterator<Item = E>
     + Add<Output = Self>
     + Add<E, Output = Self>
     + Mul<Output = Self>
     + Mul<E, Output = Self>
     + Into<Vec<E>>
-    // + From<usize>
-    // + From<f64>
 where
     E: Element,
 {
@@ -47,9 +48,10 @@ where
 
 /// Collection of traits required by the elements of a Tensor.
 pub trait Element:
-    Debug + Clone + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self>
+    Debug + Clone + PartialEq + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self> + Zero
 {
 }
+
 
 /// A Subtrait of `Tensor`, extending the interface to include methods that require more
 /// "real number like" behaviour from the tensor elements. The `RealTensor` element must be an
@@ -68,22 +70,8 @@ where
     // fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
 }
 
-// impl<T> From<T> for Vec<f64>
-// where
-//     T: RealTensor,
-// {
-//     fn from(tensor: T) -> Self {
-//         let mut vec = Vec::new();
-//         for element in tensor.iter() {
-//             vec.push(element.to_f64());
-//         }
-//         vec
-//     }
-// }
-
 /// A Subtrait of `Element`, extending the trait to capture "real number like" behaviour.
 pub trait RealElement: Element + Exp + Pow + Ln + From<f64> {
-    fn zero() -> Self;
     fn neg_inf() -> Self;
 }
 
@@ -98,8 +86,5 @@ impl Element for f64 {}
 impl RealElement for f64 {
     fn neg_inf() -> Self {
         -std::f64::INFINITY
-    }
-    fn zero() -> Self {
-        0.0
     }
 }
