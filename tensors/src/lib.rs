@@ -7,7 +7,7 @@ use std::{
 };
 
 /// Implementation of multidimensional arrays as row major strided vectors.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct TensorImpl<E>
 where
     E: Element,
@@ -77,8 +77,6 @@ impl<E: Element> TensorImpl<E> {
                 "The second tensor int matmul must have 2 dimensions",
             ));
         }
-        dbg!(&self.shape);
-        dbg!(&other.shape);
         let dim1 = self.shape[self_num_dims - 2];
         let dim_inner = self.shape[self_num_dims - 1];
         let dim2 = other.shape[other_num_dims - 2];
@@ -118,8 +116,8 @@ impl<E: Element> TensorImpl<E> {
                         let self_idx = i * lead_stride
                             + j1 * self_strides[self_num_dims - 2]
                             + j_inner * self_strides[self_num_dims - 1];
-                        let other_idx = j2 * other_strides[self_num_dims - 2]
-                            + j_inner * other_strides[self_num_dims - 1];
+                        let other_idx = j2 * other_strides[other_num_dims - 2]
+                            + j_inner * other_strides[other_num_dims - 1];
                         accumulator += self.data[self_idx].clone() * other.data[other_idx].clone();
                     }
                     new_data.push(accumulator);
@@ -337,6 +335,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
 
     #[test]
     fn test_from_vec() {
@@ -574,5 +573,38 @@ mod tests {
         let result = tensor1.matmul(&tensor2).unwrap();
         assert_eq!(result.shape, shape_expected);
         assert_eq!(result.data, data_expected);
+
+        // Check that A^T * B^T = (B * A)^T
+        let shape3 = vec![2, 2];
+        let data3 = vec![
+            0.7670520197177377,
+            0.14770389167309558,
+            0.3166885668777075,
+            0.326126502112053,
+        ];
+        let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
+
+        let lhs = tensor2.transpose().matmul(&tensor3.transpose()).unwrap();
+        let rhs = (tensor3.matmul(&tensor2).unwrap()).transpose();
+        assert_eq!(lhs, rhs)
+    }
+
+    #[test]
+    fn test_matmul_multidim() {
+        let mut rng = rand::thread_rng();
+
+        let shape1 = vec![5, 4, 3, 2];
+        let num_elements1 = num_elements_from_shape(&shape1);
+        let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+        let shape2 = vec![2, 6];
+        let num_elements2 = num_elements_from_shape(&shape2);
+        let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+        let result = tensor1.matmul(&tensor2).unwrap();
+        let shape_expected = vec![5, 4, 3, 6];
+        assert_eq!(result.shape, shape_expected);
     }
 }

@@ -1,6 +1,7 @@
 use std::{
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul},
+    cmp::{PartialEq},
 };
 use num::traits::Zero;
 
@@ -10,6 +11,7 @@ use crate::utils::{Exp, Ln, Pow};
 /// The element type must be an implementer of `Element`.
 pub trait Tensor<E>:
     Debug
+    + PartialEq
     + Clone
     //+ Sized
     //+ Iterator<Item = E>
@@ -45,7 +47,7 @@ where
 
 /// Collection of traits required by the elements of a Tensor.
 pub trait Element:
-    Debug + Clone + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self> + Zero
+    Debug + Clone + PartialEq + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self> + Zero
 {
 }
 
