@@ -123,19 +123,11 @@ where
 
         let n_elements = self.data.len();
         let mut data : Vec<E> = Vec::with_capacity(n_elements);
-
-        // This is unsafe because we're setting the length without guaranteeing that all the
-        // elements are initialized. However, the below loop writes to all the elements exactly
-        // once, so we should be good.
-        unsafe {
-            data.set_len(n_elements);
-        }
         for i in 0..leading_dims {
             for j in 0..shape[num_dims - 2] {
                 for k in 0..shape[num_dims - 1] {
-                    let idx = i * shape[num_dims - 2] * shape[num_dims - 1] + j * shape[num_dims - 1] + k;
                     let transposed_idx = i * shape[num_dims - 1] * shape[num_dims - 2] + k * shape[num_dims - 2] + j;
-                    data[idx] = self.data[transposed_idx].clone();
+                    data.push(self.data[transposed_idx].clone());
                 }
             }
         }
