@@ -1,5 +1,6 @@
 use anyhow::Error;
-use interfaces::tensors::{Element, Tensor};
+use interfaces::tensors::{Element, RealElement, RealTensor, Tensor};
+use interfaces::utils::{Exp, Ln, Pow};
 use std::{
     fmt::Debug,
     ops::{Add, Mul},
@@ -372,6 +373,30 @@ where
             shape: output_shape,
             data: dim_sum,
         }
+    }
+}
+
+impl<E: RealElement> Exp for TensorImpl<E> {
+    fn exp(self) -> Self{
+        todo!()
+    }
+}
+
+impl<E: RealElement> Pow<E> for TensorImpl<E> {
+    fn pow(self, exp: E) -> Self{
+        todo!()
+    }
+}
+
+impl<E: RealElement> Ln for TensorImpl<E> {
+    fn ln(self) -> Self{
+        todo!()
+    }
+}
+
+impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
+    fn softmax(&self, dim: usize) -> Self {
+        todo!()
     }
 }
 
