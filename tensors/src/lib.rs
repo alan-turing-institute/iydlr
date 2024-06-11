@@ -227,8 +227,8 @@ mod tests {
         let expected_shape = vec![3, 5, 4];
         assert_eq!(transposed.shape(), expected_shape);
 
-        // let expected_data = vec![1, 2, 3, 4, 5, 7, 6, 8];
-        // assert_eq!(transposed.data, expected_data);
+        // The data should be different from the original tensor
+        assert_ne!(transposed.data, original_data);
 
         // Transposing twice should return the original tensor
         let transposed_twice = transposed.transpose();
