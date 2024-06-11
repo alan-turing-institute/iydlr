@@ -35,13 +35,12 @@ where
     T: Tensor<E>,
     E: Element,
 {
-    pub fn new(embedding_dims: (usize, usize)) -> Self {
-        // Generate weights tensors W_Q, W_K, W_V with shapes like X (embedding matrix)
-
-        // Assume T has shape: (batch x sequence x channel)
-        // X.size
-        // let W_Q = L::new();
-        // let W_K = L::new();
+    pub fn new(x: &T) -> Self {
+        // Generate weights tensors W_Q, W_K, W_V with shapes (embedding_dim, d_k),
+        // where d_k is embedding_dim / num_heads. For now, we assume num_heads = 1.
+        // Then generate W_Q, W_K, W_V with same shape (batch x sequence x channel)
+        let v = x.shape();
+        let (batch_size, seq_len, embedding_dim) = (v[0], v[1], v[2]);
         todo!()
     }
 }
