@@ -2,6 +2,8 @@ use std::{
     cell::RefCell,
     fmt::Display,
     ops::{Add, AddAssign, Deref, Div, Mul},
+    rc::Rc,
+    thread,
 };
 
 use interfaces::{
@@ -9,8 +11,8 @@ use interfaces::{
     utils::{Exp, Ln, Pow},
 };
 
-type Ptr<N> = Box<N>;
-// type Ptr<N> = Rc<RefCell<N>>;
+// type Ptr<N> = Box<N>;
+type Ptr<N> = Rc<RefCell<N>>;
 
 /// A node in a computation graph.
 #[derive(Debug)]
@@ -81,38 +83,45 @@ impl<T: RealElement + From<f64>> Node<T> {
         // TODO: check all these: why is there a factor self_grad in Sum & Prod but not elsewhere?
         match self {
             Node::Sum(_, _, (ref mut n1, ref mut n2)) => {
-                n1.set_grad(self_grad.to_owned());
-                n2.set_grad(self_grad.to_owned());
-                n1.propagate_backward();
-                n2.propagate_backward(); // TODO: spawn new thread.
+                n1.borrow_mut().set_grad(self_grad.to_owned());
+                n2.borrow_mut().set_grad(self_grad.to_owned());
+                n1.borrow_mut().propagate_backward();
+                n2.borrow_mut().propagate_backward(); // TODO: spawn new thread.
             }
             Node::Prod(_, _, (ref mut n1, ref mut n2)) => {
-                n1.set_grad(n2.val().to_owned() * self_grad.clone());
-                n2.set_grad(n1.val().to_owned() * self_grad);
-                n1.propagate_backward();
-                n2.propagate_backward(); // TODO: spawn new thread.
+                n1.borrow_mut()
+                    .set_grad(n2.borrow().val().to_owned() * self_grad.clone());
+                n2.borrow_mut()
+                    .set_grad(n1.borrow().val().to_owned() * self_grad);
+                n1.borrow_mut().propagate_backward();
+                n2.borrow_mut().propagate_backward(); // TODO: spawn new thread.
             }
             Node::Exp(_, _, ref mut n) => {
-                n.set_grad(self_val);
-                n.propagate_backward();
+                n.borrow_mut().set_grad(self_val);
+                n.borrow_mut().propagate_backward();
             }
             Node::Ln(_, _, ref mut n) => {
-                n.set_grad(<f64 as Into<T>>::into(1_f64) / self_val);
-                n.propagate_backward();
+                n.borrow_mut()
+                    .set_grad(<f64 as Into<T>>::into(1_f64) / self_val);
+                n.borrow_mut().propagate_backward();
             }
             // Node::Ln(_, _, ref mut n) => n.set_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
             Node::Pow(_, _, (ref mut n1, ref mut n2)) => {
                 // exponent . base^(exponent - 1)
-                n1.set_grad(
-                    n2.val().to_owned()
-                        * n1.val()
+                n1.borrow_mut().set_grad(
+                    n2.borrow().val().to_owned()
+                        * n1.borrow()
+                            .val()
                             .clone()
-                            .pow(n2.val().to_owned() + <f64 as Into<T>>::into(-1_f64)),
+                            .pow(n2.borrow().val().to_owned() + <f64 as Into<T>>::into(-1_f64)),
                 );
                 // base^exponent . ln(base)
-                n2.set_grad((n1.val().clone()).pow(n2.val().to_owned()) * n1.val().clone().ln());
-                n1.propagate_backward();
-                n2.propagate_backward(); // TODO: spawn new thread.
+                n2.borrow_mut().set_grad(
+                    (n1.borrow().val().clone()).pow(n2.borrow().val().to_owned())
+                        * n1.borrow().val().clone().ln(),
+                );
+                n1.borrow_mut().propagate_backward();
+                n2.borrow_mut().propagate_backward(); // TODO: spawn new thread.
             }
             Node::Leaf(_, _) => {} // Do nothing.
         }
@@ -126,7 +135,7 @@ impl<T: RealElement + From<f64>> Add<Node<T>> for Node<T> {
         Node::Sum(
             self.val().clone() + _rhs.val().clone(),
             None,
-            (self.into(), _rhs.into()),
+            (Rc::new(RefCell::new(self)), Rc::new(RefCell::new(_rhs))),
         )
     }
 }
@@ -138,7 +147,7 @@ impl<T: RealElement + From<f64>> Mul<Node<T>> for Node<T> {
         Node::Prod(
             self.val().clone() * _rhs.val().clone(),
             None,
-            (self.into(), _rhs.into()),
+            (Rc::new(RefCell::new(self)), Rc::new(RefCell::new(_rhs))),
         )
     }
 }
@@ -151,20 +160,20 @@ impl<T: RealElement + From<f64>> Div<Node<T>> for Node<T> {
         Node::Prod(
             self.val().clone() / _rhs.val().clone(),
             None,
-            (self.into(), _rhs.into()),
+            (Rc::new(RefCell::new(self)), Rc::new(RefCell::new(_rhs))),
         )
     }
 }
 
 impl<T: RealElement + From<f64>> Exp for Node<T> {
     fn exp(self) -> Self {
-        Node::Exp(self.val().clone().exp(), None, self.into())
+        Node::Exp(self.val().clone().exp(), None, Rc::new(RefCell::new(self)))
     }
 }
 
 impl<T: RealElement + From<f64>> Ln for Node<T> {
     fn ln(self) -> Self {
-        Node::Exp(self.val().clone().ln(), None, self.into())
+        Node::Exp(self.val().clone().ln(), None, Rc::new(RefCell::new(self)))
     }
 }
 
@@ -173,7 +182,7 @@ impl<T: RealElement + From<f64>> Pow for Node<T> {
         Node::Pow(
             self.val().clone().pow(exponent.val().clone()), // Note: unnecessary clone of exp.val() here?
             None,
-            (self.into(), exponent.into()), // Base in position 1, exponent in position 2.
+            (Rc::new(RefCell::new(self)), Rc::new(RefCell::new(exponent))), // Base in position 1, exponent in position 2.
         )
     }
 }
@@ -295,8 +304,8 @@ mod tests {
         assert!(node.grad().is_none());
         match &node {
             Node::Sum(_, _, (n1, n2)) => {
-                assert!(n1.grad().is_none());
-                assert!(n2.grad().is_none());
+                assert!(n1.borrow().grad().is_none());
+                assert!(n2.borrow().grad().is_none());
             }
             _ => panic!(),
         }
@@ -307,10 +316,10 @@ mod tests {
         assert_eq!(node.grad().unwrap(), 5.0_f64);
         match &node {
             Node::Sum(_, _, (n1, n2)) => {
-                assert!(n1.grad().is_some());
-                assert_eq!(n1.grad().unwrap(), 5.0_f64);
-                assert!(n2.grad().is_some());
-                assert_eq!(n2.grad().unwrap(), 5.0_f64);
+                assert!(n1.borrow().grad().is_some());
+                assert_eq!(n1.borrow().grad().unwrap(), 5.0_f64);
+                assert!(n2.borrow().grad().is_some());
+                assert_eq!(n2.borrow().grad().unwrap(), 5.0_f64);
             }
             _ => panic!(),
         }
@@ -326,8 +335,8 @@ mod tests {
         assert!(node.grad().is_none());
         match &node {
             Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.grad().is_none());
-                assert!(n2.grad().is_none());
+                assert!(n1.borrow().grad().is_none());
+                assert!(n2.borrow().grad().is_none());
             }
             _ => panic!(),
         }
@@ -338,10 +347,10 @@ mod tests {
         assert_eq!(node.grad().unwrap(), 5.0_f64);
         match &node {
             Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.grad().is_some());
-                assert_eq!(n1.grad().unwrap(), 11.0_f64);
-                assert!(n2.grad().is_some());
-                assert_eq!(n2.grad().unwrap(), 5.5_f64);
+                assert!(n1.borrow().grad().is_some());
+                assert_eq!(n1.borrow().grad().unwrap(), 11.0_f64);
+                assert!(n2.borrow().grad().is_some());
+                assert_eq!(n2.borrow().grad().unwrap(), 5.5_f64);
             }
             _ => panic!(),
         }
@@ -360,22 +369,22 @@ mod tests {
         assert!(node_f.grad().is_none());
         match &node_f {
             Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.grad().is_none());
-                assert!(n2.grad().is_none());
+                assert!(n1.borrow().grad().is_none());
+                assert!(n2.borrow().grad().is_none());
             }
             _ => panic!(),
         }
         match &node_f {
             Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.grad().is_none());
-                match n1.deref() {
+                assert!(n1.borrow().grad().is_none());
+                match n1.borrow().deref() {
                     Node::Sum(_, _, (n11, n12)) => {
-                        assert!(n11.grad().is_none());
-                        assert!(n12.grad().is_none());
+                        assert!(n11.borrow().grad().is_none());
+                        assert!(n12.borrow().grad().is_none());
                     }
                     _ => panic!(),
                 }
-                assert!(n2.grad().is_none());
+                assert!(n2.borrow().grad().is_none());
             }
             _ => panic!(),
         }
@@ -389,28 +398,28 @@ mod tests {
 
         match &node_f {
             Node::Prod(_, _, (d, c)) => {
-                assert!(d.grad().is_some());
-                assert_eq!(d.grad().unwrap(), 20.0_f64);
-                assert!(c.grad().is_some());
-                assert_eq!(c.grad().unwrap(), 50.0_f64);
+                assert!(d.borrow().grad().is_some());
+                assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
+                assert!(c.borrow().grad().is_some());
+                assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
             }
             _ => panic!(),
         }
         match &node_f {
             Node::Prod(_, _, (d, c)) => {
-                assert!(d.grad().is_some());
-                assert_eq!(d.grad().unwrap(), 20.0_f64);
-                match d.deref() {
+                assert!(d.borrow().grad().is_some());
+                assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
+                match d.borrow().deref() {
                     Node::Sum(_, _, (a, b)) => {
-                        assert!(a.grad().is_some());
-                        assert_eq!(a.grad().unwrap(), 20.0_f64);
-                        assert!(b.grad().is_some());
-                        assert_eq!(b.grad().unwrap(), 20.0_f64);
+                        assert!(a.borrow().grad().is_some());
+                        assert_eq!(a.borrow().grad().unwrap(), 20.0_f64);
+                        assert!(b.borrow().grad().is_some());
+                        assert_eq!(b.borrow().grad().unwrap(), 20.0_f64);
                     }
                     _ => panic!(),
                 }
-                assert!(c.grad().is_some());
-                assert_eq!(c.grad().unwrap(), 50.0_f64);
+                assert!(c.borrow().grad().is_some());
+                assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
             }
             _ => panic!(),
         }
