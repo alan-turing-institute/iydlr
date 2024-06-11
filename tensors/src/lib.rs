@@ -20,7 +20,7 @@ impl<E: Element> Add for TensorImpl<E> {
             panic!("Shapes are not compatible for element-wise operations.");
         }
 
-        let data = self
+        let data: Vec<E> = self
             .data
             .iter()
             .zip(other.data.iter())
@@ -28,7 +28,7 @@ impl<E: Element> Add for TensorImpl<E> {
             .map(|(a, b)| a.clone() + b.clone())
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(self.shape(), data).unwrap()
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 }
 
@@ -37,14 +37,14 @@ impl<E: Element> Add<E> for TensorImpl<E> {
     type Output = Self;
 
     fn add(self, scalar: E) -> Self {
-        let data = self
+        let data: Vec<E> = self
             .data
             .iter()
             // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
             .map(|a| a.clone() + scalar.clone())
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(self.shape(), data).unwrap()
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 }
 
@@ -57,7 +57,7 @@ impl<E: Element> Mul for TensorImpl<E> {
             panic!("Shapes are not compatible for element-wise operations.");
         }
 
-        let data = self
+        let data: Vec<E> = self
             .data
             .iter()
             .zip(other.data.iter())
@@ -65,7 +65,7 @@ impl<E: Element> Mul for TensorImpl<E> {
             .map(|(a, b)| a.clone() * b.clone())
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(self.shape(), data).unwrap()
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 }
 
@@ -74,14 +74,14 @@ impl<E: Element> Mul<E> for TensorImpl<E> {
     type Output = Self;
 
     fn mul(self, scalar: E) -> Self {
-        let data = self
+        let data: Vec<E> = self
             .data
             .iter()
             // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
             .map(|a| a.clone() * scalar.clone())
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(self.shape(), data).unwrap()
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 }
 
@@ -91,13 +91,16 @@ where
 {
     type TensorError = Error;
 
-    fn from_vec(shape: Vec<usize>, data: Vec<E>) -> Result<Self, Self::TensorError> {
+    fn from_vec(shape: &Vec<usize>, data: &Vec<E>) -> Result<Self, Self::TensorError> {
         if shape.iter().product::<usize>() != data.len() {
             return Err(Error::msg(
                 "The length of the `data` param does not match the values of the `shape` param",
             ));
         } else {
-            Ok(TensorImpl { shape, data })
+            Ok(TensorImpl {
+                shape:shape.clone(),
+                data:data.clone()
+            })
         }
     }
 
@@ -149,7 +152,7 @@ mod tests {
     fn test_from_vec() {
         let shape = vec![2, 3];
         let data = vec![1, 2, 3, 4, 5, 6];
-        let maybe_tensor = TensorImpl::from_vec(shape.clone(), data.clone());
+        let maybe_tensor = TensorImpl::from_vec(&shape, &data);
         let tensor = maybe_tensor.unwrap();
 
         assert_eq!(tensor.shape(), shape);
@@ -161,7 +164,7 @@ mod tests {
         // The length of the `data` Vec is not that implied by the `shape` Vec
         let shape = vec![2, 3];
         let data = vec![1, 2];
-        let maybe_tensor = TensorImpl::from_vec(shape.clone(), data.clone());
+        let maybe_tensor = TensorImpl::from_vec(&shape, &data);
         assert!(maybe_tensor.is_err());
         let err = maybe_tensor.unwrap_err();
 
@@ -174,29 +177,62 @@ mod tests {
     fn test_shape() {
         let shape = vec![2, 3];
         let data = vec![1, 2, 3, 4, 5, 6];
-        let tensor = TensorImpl::from_vec(shape.clone(), data);
+        let tensor = TensorImpl::from_vec(&shape, &data);
 
         assert_eq!(tensor.unwrap().shape(), shape);
     }
 
     #[test]
-    fn test_transpose() {
-        let shape = vec![2, 3];
-        let data = vec![1, 2, 3, 4, 5, 6];
-        let tensor = TensorImpl::from_vec(shape.clone(), data).unwrap();
+    fn test_transpose_1d_tensor() {
+        let shape = vec![2];
+        let data = vec![1, 2];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
         let transposed = tensor.transpose();
-        assert_eq!(transposed.shape(), vec![3, 2]);
+        assert_eq!(transposed.shape(), shape);
+        // Transposing a 1D tensor should return the original tensor
+        assert_eq!(transposed.data, data);
+    }
 
-        let shape = vec![2, 2];
-        let original_data = vec![1, 2, 3, 4];
-        let tensor = TensorImpl::from_vec(shape.clone(), original_data).unwrap();
-        let transposed = tensor.transpose();
-        assert_eq!(transposed.shape(), vec![2, 2]);
+    #[test]
+    fn test_transpose_2d_tensor() {
+        // Case 1
+        let shape1 = vec![2, 3];
+        let data1 = vec![1, 2, 3, 4, 5, 6];
+        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+        let transposed1 = tensor1.transpose();
+        assert_eq!(transposed1.shape(), vec![3, 2]);
 
-        let expected_data = vec![1, 3, 2, 4];
-        assert_eq!(transposed.data, expected_data);
+        // Case 2
+        let shape2 = vec![2, 2];
+        let original_data2 = vec![1, 2, 3, 4];
+        let tensor2 = TensorImpl::from_vec(&shape2, &original_data2).unwrap();
+        let transposed2 = tensor2.transpose();
+        assert_eq!(transposed2.shape(), vec![2, 2]);
+
+        let expected_data2 = vec![1, 3, 2, 4];
+        assert_eq!(transposed2.data, expected_data2);
 
     }
+
+    #[test]
+    fn test_transpose_3d_tensor() {
+        let shape = vec![3, 4, 5];
+        let original_data = (1..61).collect::<Vec<i32>>();
+
+        let tensor = TensorImpl::from_vec(&shape, &original_data).unwrap();
+        let transposed = tensor.transpose();
+        let expected_shape = vec![3, 5, 4];
+        assert_eq!(transposed.shape(), expected_shape);
+
+        // let expected_data = vec![1, 2, 3, 4, 5, 7, 6, 8];
+        // assert_eq!(transposed.data, expected_data);
+
+        // Transposing twice should return the original tensor
+        let transposed_twice = transposed.transpose();
+        assert_eq!(transposed_twice.shape(), shape);
+        assert_eq!(transposed_twice.data, original_data);
+    }
+
 
     // Addition
     #[test]
@@ -204,8 +240,8 @@ mod tests {
         let shape = vec![2, 3];
         let data1 = vec![1, 2, 3, 4, 5, 6];
         let data2 = vec![10, 20, 30, 40, 50, 60];
-        let tensor1 = TensorImpl::from_vec(shape.clone(), data1).unwrap();
-        let tensor2 = TensorImpl::from_vec(shape.clone(), data2).unwrap();
+        let tensor1 = TensorImpl::from_vec(&shape, &data1).unwrap();
+        let tensor2 = TensorImpl::from_vec(&shape, &data2).unwrap();
 
         let tensor3 = tensor1 + tensor2;
         assert_eq!(tensor3.data, vec![11, 22, 33, 44, 55, 66]);
@@ -217,8 +253,8 @@ mod tests {
         let shape2 = vec![2, 2];
         let data1 = vec![1, 2, 3, 4, 5, 6];
         let data2 = vec![10, 20, 30, 40];
-        let tensor1 = TensorImpl::from_vec(shape1.clone(), data1).unwrap();
-        let tensor2 = TensorImpl::from_vec(shape2.clone(), data2).unwrap();
+        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
 
         assert!(std::panic::catch_unwind(|| tensor1 + tensor2).is_err());
     }
@@ -227,7 +263,7 @@ mod tests {
     fn test_adding_tensors_and_scalars() {
         let shape = vec![2, 3];
         let data = vec![1, 2, 3, 4, 5, 6];
-        let tensor = TensorImpl::from_vec(shape.clone(), data).unwrap();
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
         let tensor2 = tensor + 10;
         assert_eq!(tensor2.data, vec![11, 12, 13, 14, 15, 16]);
@@ -239,8 +275,8 @@ mod tests {
         let shape = vec![2, 3];
         let data1 = vec![1, 2, 3, 4, 5, 6];
         let data2 = vec![10, 20, 30, 40, 50, 60];
-        let tensor1 = TensorImpl::from_vec(shape.clone(), data1).unwrap();
-        let tensor2 = TensorImpl::from_vec(shape.clone(), data2).unwrap();
+        let tensor1 = TensorImpl::from_vec(&shape, &data1).unwrap();
+        let tensor2 = TensorImpl::from_vec(&shape, &data2).unwrap();
 
         let tensor3 = tensor1 * tensor2;
         assert_eq!(tensor3.data, vec![10, 40, 90, 160, 250, 360]);
@@ -252,8 +288,8 @@ mod tests {
         let shape2 = vec![2, 2];
         let data1 = vec![1, 2, 3, 4, 5, 6];
         let data2 = vec![10, 20, 30, 40];
-        let tensor1 = TensorImpl::from_vec(shape1.clone(), data1).unwrap();
-        let tensor2 = TensorImpl::from_vec(shape2.clone(), data2).unwrap();
+        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
 
         assert!(std::panic::catch_unwind(|| tensor1 * tensor2).is_err());
     }
@@ -262,7 +298,7 @@ mod tests {
     fn test_multiplying_tensors_and_scalars() {
         let shape = vec![2, 3];
         let data = vec![1, 2, 3, 4, 5, 6];
-        let tensor = TensorImpl::from_vec(shape.clone(), data).unwrap();
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
         let tensor2 = tensor * 10;
         assert_eq!(tensor2.data, vec![10, 20, 30, 40, 50, 60]);
