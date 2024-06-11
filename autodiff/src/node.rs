@@ -346,4 +346,73 @@ mod tests {
             _ => panic!(),
         }
     }
+
+    #[test]
+    fn test_backward() {
+        let node_a = Node::new(3.0, None);
+        let node_b = Node::new(2.0, None);
+        let node_c = Node::new(2.0, None);
+
+        let node_d = node_a + node_b;
+        let node_f = node_d * node_c;
+
+        // Check all grads are None initially.
+        assert!(node_f.grad().is_none());
+        match &node_f {
+            Node::Prod(_, _, (n1, n2)) => {
+                assert!(n1.grad().is_none());
+                assert!(n2.grad().is_none());
+            }
+            _ => panic!(),
+        }
+        match &node_f {
+            Node::Prod(_, _, (n1, n2)) => {
+                assert!(n1.grad().is_none());
+                match n1.deref() {
+                    Node::Sum(_, _, (n11, n12)) => {
+                        assert!(n11.grad().is_none());
+                        assert!(n12.grad().is_none());
+                    }
+                    _ => panic!(),
+                }
+                assert!(n2.grad().is_none());
+            }
+            _ => panic!(),
+        }
+
+        let node_f = node_f.backward(10.0);
+
+        // Check all grads have been populated.
+
+        assert!(node_f.grad().is_some());
+        assert_eq!(node_f.grad().unwrap(), 10.0_f64);
+
+        match &node_f {
+            Node::Prod(_, _, (d, c)) => {
+                assert!(d.grad().is_some());
+                assert_eq!(d.grad().unwrap(), 20.0_f64);
+                assert!(c.grad().is_some());
+                assert_eq!(c.grad().unwrap(), 50.0_f64);
+            }
+            _ => panic!(),
+        }
+        match &node_f {
+            Node::Prod(_, _, (d, c)) => {
+                assert!(d.grad().is_some());
+                assert_eq!(d.grad().unwrap(), 20.0_f64);
+                match d.deref() {
+                    Node::Sum(_, _, (a, b)) => {
+                        assert!(a.grad().is_some());
+                        assert_eq!(a.grad().unwrap(), 20.0_f64);
+                        assert!(b.grad().is_some());
+                        assert_eq!(b.grad().unwrap(), 20.0_f64);
+                    }
+                    _ => panic!(),
+                }
+                assert!(c.grad().is_some());
+                assert_eq!(c.grad().unwrap(), 50.0_f64);
+            }
+            _ => panic!(),
+        }
+    }
 }
