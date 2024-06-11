@@ -9,6 +9,7 @@ use interfaces::{
     tensors::{Element, RealElement},
     utils::{Exp, Ln, Pow},
 };
+use num_traits::Zero;
 
 // type Ptr<N> = Box<N>;
 type Ptr<N> = Rc<RefCell<N>>;
@@ -209,8 +210,49 @@ impl<T: RealElement> Clone for Node<T> {
     }
 }
 
+impl<T: RealElement> PartialEq for Node<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Sum(l0, l1, l2), Self::Sum(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
+            (Self::Prod(l0, l1, l2), Self::Prod(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
+            (Self::Exp(l0, l1, l2), Self::Exp(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
+            (Self::Ln(l0, l1, l2), Self::Ln(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
+            (Self::Pow(l0, l1, l2), Self::Pow(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
+            (Self::Leaf(l0, l1), Self::Leaf(r0, r1)) => l0 == r0 && l1 == r1,
+            _ => false,
+        }
+    }
+}
+
+// impl<T: RealElement> From<T> for Node<T> {
+//     fn from(value: T) -> Self {
+//         Node::new(value, None)
+//     }
+// }
+
+impl<T: RealElement> From<f64> for Node<T> {
+    fn from(value: f64) -> Self {
+        Node::new(value.into(), None)
+    }
+}
+
+impl<T: RealElement> Zero for Node<T> {
+    fn zero() -> Self {
+        Node::new(0_f64.into(), None)
+    }
+
+    fn is_zero(&self) -> bool {
+        Self::zero().eq(self)
+    }
+}
+
 impl<T: RealElement + From<f64>> Element for Node<T> {}
-impl<T: RealElement + From<f64>> RealElement for Node<T> {}
+
+impl<T: RealElement + From<f64>> RealElement for Node<T> {
+    fn neg_inf() -> Self {
+        Node::new((-f64::INFINITY).into(), None)
+    }
+}
 
 #[cfg(test)]
 mod tests {
