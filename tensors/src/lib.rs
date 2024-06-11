@@ -140,10 +140,9 @@ impl<E: Element> IntoIterator for TensorImpl<E> {
     }
 }
 
-// TODO: add implementation for flattening TensorImpl into a vector of elements.
 impl<E: Element> From<TensorImpl<E>> for Vec<E> {
     fn from(value: TensorImpl<E>) -> Self {
-        todo!()
+        value.data.into_iter().collect()
     }
 }
 
@@ -640,5 +639,13 @@ mod tests {
         let data = vec![1, 2, 3, 4, 5, 6];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
         assert_eq!(tensor.into_iter().collect::<Vec<i32>>(), data);
+    }
+
+    #[test]
+    fn test_to_vec() {
+        let shape = vec![2, 3];
+        let data = vec![1, 2, 3, 4, 5, 6];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        assert_eq!(Vec::<i32>::from(tensor), data);
     }
 }
