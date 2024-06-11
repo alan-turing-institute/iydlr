@@ -6,7 +6,7 @@ use std::{
 use crate::utils::{Exp, Ln, Pow};
 
 /// Tensor interface, generic over the the type of the elements contained within the tensor.
-/// The element type must be an implimenter of `Element`.
+/// The element type must be an implementer of `Element`.
 pub trait Tensor<E>:
     Debug
     + Clone
@@ -14,10 +14,8 @@ pub trait Tensor<E>:
     //+ Iterator<Item = E>
     + Add<Output = Self>
     + Add<E, Output = Self>
-    // + Mul<Output = Self>
-    // + Mul<E, Output = Self>
-    // + Div<Output = Self>
-    // + Div<E, Output = Self>
+    + Mul<Output = Self>
+    + Mul<E, Output = Self>
 where
     E: Element,
 {
@@ -25,7 +23,7 @@ where
 
     fn shape(&self) -> Vec<usize>;
 
-    fn from_vec(shape: Vec<usize>, data: Vec<E>) -> Result<Self, Self::TensorError>;
+    fn from_vec(shape: &Vec<usize>, data: &Vec<E>) -> Result<Self, Self::TensorError>;
 
     ///// Fill a matrix by repeatedly cloning the provided element.
     ///// Note: the behaviour might be unexpected if the provided element clones "by reference".
@@ -35,7 +33,7 @@ where
 
     //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
 
-    //fn transpose(self) -> Self;
+    fn transpose(&self) -> Self;
 
     //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
 
