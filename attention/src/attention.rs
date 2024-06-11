@@ -3,7 +3,7 @@ use interfaces::tensors::{RealElement, RealTensor, Tensor};
 use std::marker::PhantomData;
 
 /// Interleaves last dimension of the input tensors and concatenates them along the last dimension.
-fn concat<E: RealElement, T: RealTensor<E>>(x: T, y: T) -> T {
+pub fn concat<E: RealElement, T: RealTensor<E>>(x: T, y: T) -> T {
     let x_shape = x.shape();
     let y_shape = y.shape();
     // TODO: not sure why can't use Vec::from(), but does't compile
