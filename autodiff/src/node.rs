@@ -106,22 +106,19 @@ impl<T: RealElement + From<f64>> Node<T> {
                 n.borrow_mut().propagate_backward();
             }
             // Node::Ln(_, _, ref mut n) => n.set_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
-            Node::Pow(_, _, (ref mut n1, ref mut n2)) => {
+            Node::Pow(_, _, (ref mut b, ref mut e)) => {
                 // exponent . base^(exponent - 1)
-                n1.borrow_mut().set_grad(
-                    n2.borrow().val().to_owned()
-                        * n1.borrow()
-                            .val()
-                            .clone()
-                            .pow(n2.borrow().val().to_owned() + <f64 as Into<T>>::into(-1_f64)),
-                );
+                let b_val = b.borrow().val().clone();
+                let e_val = e.borrow().val().clone();
+                let minus_one = <f64 as Into<T>>::into(-1_f64);
+                b.borrow_mut()
+                    .set_grad(e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one));
+
                 // base^exponent . ln(base)
-                n2.borrow_mut().set_grad(
-                    (n1.borrow().val().clone()).pow(n2.borrow().val().to_owned())
-                        * n1.borrow().val().clone().ln(),
-                );
-                n1.borrow_mut().propagate_backward();
-                n2.borrow_mut().propagate_backward(); // TODO: spawn new thread.
+                e.borrow_mut()
+                    .set_grad(b_val.clone().pow(e_val.to_owned()) * b_val.ln());
+                b.borrow_mut().propagate_backward();
+                e.borrow_mut().propagate_backward(); // TODO: spawn new thread.
             }
             Node::Leaf(_, _) => {} // Do nothing.
         }
@@ -201,7 +198,7 @@ impl<T: RealElement> Display for Node<T> {
 
 impl<T: RealElement> Clone for Node<T> {
     fn clone(&self) -> Self {
-        todo!();
+        // todo!();
         match self {
             Self::Sum(arg0, arg1, arg2) => Self::Sum(arg0.clone(), arg1.clone(), arg2.clone()),
             Self::Prod(arg0, arg1, arg2) => Self::Prod(arg0.clone(), arg1.clone(), arg2.clone()),
@@ -218,6 +215,8 @@ impl<T: RealElement + From<f64>> RealElement for Node<T> {}
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::BorrowMut;
+
     use super::*;
 
     #[test]
@@ -357,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn test_backward() {
+    fn test_backward_on_prod_sum() {
         let node_a = Node::new(3.0, None);
         let node_b = Node::new(2.0, None);
         let node_c = Node::new(2.0, None);
@@ -423,5 +422,55 @@ mod tests {
             }
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn test_backward_on_2x_squared_plus_exp_5x() {
+        // Expression: f(x) = 2x^2 + exp(5x)
+        let node_x = Node::new(3.0, None);
+
+        let node_2 = Node::new(2.0, None);
+        let node_2_ = Node::new(2.0, None);
+        let node_5 = Node::new(5.0, None);
+
+        let node_5x = node_5 * node_x.clone();
+        let node_exp_5x = node_5x.exp();
+        let node_x_squared = node_x.pow(node_2);
+        let node_2x_squared = node_x_squared * node_2_;
+
+        let node_f = node_exp_5x + node_2x_squared;
+
+        let node_f = node_f.backward(1.0);
+
+        // Check all grads have been populated.
+        // assert_eq!(node_f.grad().unwrap(), 1.0_f64);
+
+        // match &node_f {
+        //     Node::Prod(_, _, (d, c)) => {
+        //         assert!(d.borrow().grad().is_some());
+        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
+        //         assert!(c.borrow().grad().is_some());
+        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
+        //     }
+        //     _ => panic!(),
+        // }
+        // match &node_f {
+        //     Node::Prod(_, _, (d, c)) => {
+        //         assert!(d.borrow().grad().is_some());
+        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
+        //         match d.borrow().deref() {
+        //             Node::Sum(_, _, (a, b)) => {
+        //                 assert!(a.borrow().grad().is_some());
+        //                 assert_eq!(a.borrow().grad().unwrap(), 20.0_f64);
+        //                 assert!(b.borrow().grad().is_some());
+        //                 assert_eq!(b.borrow().grad().unwrap(), 20.0_f64);
+        //             }
+        //             _ => panic!(),
+        //         }
+        //         assert!(c.borrow().grad().is_some());
+        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
+        //     }
+        //     _ => panic!(),
+        // }
     }
 }
