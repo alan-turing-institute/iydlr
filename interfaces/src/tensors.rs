@@ -16,6 +16,9 @@ pub trait Tensor<E>:
     + Add<E, Output = Self>
     + Mul<Output = Self>
     + Mul<E, Output = Self>
+    + Into<Vec<E>>
+    // + From<usize>
+    // + From<f64>
 where
     E: Element,
 {
@@ -65,8 +68,24 @@ where
     // fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
 }
 
+// impl<T> From<T> for Vec<f64>
+// where
+//     T: RealTensor,
+// {
+//     fn from(tensor: T) -> Self {
+//         let mut vec = Vec::new();
+//         for element in tensor.iter() {
+//             vec.push(element.to_f64());
+//         }
+//         vec
+//     }
+// }
+
 /// A Subtrait of `Element`, extending the trait to capture "real number like" behaviour.
-pub trait RealElement: Element + Exp + Pow + Ln {}
+pub trait RealElement: Element + Exp + Pow + Ln + From<f64> {
+    fn zero() -> Self;
+    fn neg_inf() -> Self;
+}
 
 // Below are some implementations of `Element` and `RealElement` "for free". This should facilitate
 // unit testing with these types.
@@ -76,4 +95,11 @@ impl Element for u16 {}
 impl Element for i32 {}
 impl Element for f64 {}
 
-impl RealElement for f64 {}
+impl RealElement for f64 {
+    fn neg_inf() -> Self {
+        -std::f64::INFINITY
+    }
+    fn zero() -> Self {
+        0.0
+    }
+}

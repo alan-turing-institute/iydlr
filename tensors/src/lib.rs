@@ -18,8 +18,8 @@ where
 
 fn strides_from_shape(shape: &Vec<usize>) -> Vec<usize> {
     let mut strides = vec![1];
-    for i in 0..(shape.len()-1) {
-        strides.push(strides[i] * shape[shape.len()-1-i]);
+    for i in 0..(shape.len() - 1) {
+        strides.push(strides[i] * shape[shape.len() - 1 - i]);
     }
     return strides.into_iter().rev().collect();
 }
@@ -30,7 +30,7 @@ fn num_elements_from_shape(shape: &Vec<usize>) -> usize {
 
 impl<E: Element> TensorImpl<E> {
     fn strides(&self) -> Vec<usize> {
-        return strides_from_shape(&self.shape)
+        return strides_from_shape(&self.shape);
     }
 
     fn num_dims(&self) -> usize {
@@ -43,7 +43,10 @@ impl<E: Element> TensorImpl<E> {
 
     fn vec_indx(&self, idxs: Vec<usize>) -> usize {
         let s = self.strides();
-        return idxs.iter().zip(s.iter()).fold(0, |acc, (idx, stride)| acc + idx * stride)
+        return idxs
+            .iter()
+            .zip(s.iter())
+            .fold(0, |acc, (idx, stride)| acc + idx * stride);
     }
 
     // TODO(mhauru) This should return something like a view, which references the same data but is
@@ -54,6 +57,13 @@ impl<E: Element> TensorImpl<E> {
     //    }
     //    self.shape = new_shape;
     //}
+}
+
+// TODO: add implementation for flattening TensorImpl into a vector of elements.
+impl<E: Element> From<TensorImpl<E>> for Vec<E> {
+    fn from(value: TensorImpl<E>) -> Self {
+        todo!()
+    }
 }
 
 /// Adding to two tensors together.
@@ -186,7 +196,7 @@ where
         // Create an unallocated data vector the same size as the original.
         let n_elements = self.num_elements();
         let mut new_data: Vec<E> = Vec::with_capacity(n_elements);
-        
+
         // Loop over the elements in the order of new_data.
         let strides = self.strides();
         dbg!(&self.shape);
@@ -198,13 +208,17 @@ where
                 for k in 0..new_shape[num_dims - 1] {
                     // Find the data index of this element in the original matrix.
                     // Note the reversal of the roles of k an j.
-                    let transposed_idx = i * lead_stride + k * strides[num_dims-2] + j * strides[num_dims-1];
+                    let transposed_idx =
+                        i * lead_stride + k * strides[num_dims - 2] + j * strides[num_dims - 1];
                     dbg!(&transposed_idx);
                     new_data.push(self.data[transposed_idx].clone());
                 }
             }
         }
-        return TensorImpl{shape: new_shape, data: new_data};
+        return TensorImpl {
+            shape: new_shape,
+            data: new_data,
+        };
     }
 
     fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError> {
@@ -230,7 +244,12 @@ where
         }
 
         let leading_dims = self.shape.iter().take(dim).into_iter().product::<usize>();
-        let trailing_dims = self.shape.iter().skip(dim + 1).into_iter().product::<usize>();
+        let trailing_dims = self
+            .shape
+            .iter()
+            .skip(dim + 1)
+            .into_iter()
+            .product::<usize>();
 
         // let mut sum = E::zero();
 
@@ -246,7 +265,6 @@ where
 
         todo!()
     }
-
 }
 
 #[cfg(test)]
@@ -427,5 +445,4 @@ mod tests {
         let actual_col_sum = tensor.single_dim_sum(1);
         assert_eq!(actual_col_sum.data, expected_col_sum);
     }
-
 }
