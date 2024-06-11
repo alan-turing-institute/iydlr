@@ -1,5 +1,7 @@
 [workspace]
 
 members = [
-    "interfaces", "tensors",
+    "attention", "interfaces", "tensors",
 ]
+
+resolver = "2"
