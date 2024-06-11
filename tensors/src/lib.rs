@@ -153,9 +153,11 @@ where
         self.shape.clone()
     }
 
-    ///// Fill a matrix by repeatedly cloning the provided element.
-    ///// Note: the behaviour might be unexpected if the provided element clones "by reference".
-    //fn fill_with_clone(shape: Vec<usize>, element: E) -> Self {}
+    /// Fill a matrix by repeatedly cloning the provided element.
+    /// Note: the behaviour might be unexpected if the provided element clones "by reference".
+    fn fill_with_clone(shape: Vec<usize>, element: E) -> Self {
+        todo!()
+    }
 
     fn at(&self, idxs: Vec<usize>) -> Option<&E> {
         return self.data.get(self.vec_indx(idxs));
@@ -165,8 +167,6 @@ where
         let index = self.vec_indx(idxs);
         return self.data.get_mut(index);
     }
-
-    //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
 
     fn transpose(&self) -> Self {
         if self.shape.len() < 2 {
@@ -207,10 +207,12 @@ where
         return TensorImpl{shape: new_shape, data: new_data};
     }
 
-    //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
+    fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError> {
+        todo!()
+    }
 
-    ///// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
-    ///// vector")
+    /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
+    /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self {
         unimplemented!()
     }

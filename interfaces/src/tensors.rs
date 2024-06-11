@@ -25,9 +25,9 @@ where
 
     fn from_vec(shape: &Vec<usize>, data: &Vec<E>) -> Result<Self, Self::TensorError>;
 
-    ///// Fill a matrix by repeatedly cloning the provided element.
-    ///// Note: the behaviour might be unexpected if the provided element clones "by reference".
-    //fn fill_with_clone(shape: Vec<usize>, element: E) -> Self;
+    // Fill a matrix by repeatedly cloning the provided element.
+    // Note: the behaviour might be unexpected if the provided element clones "by reference".
+    fn fill_with_clone(shape: Vec<usize>, element: E) -> Self;
 
     fn at(&self, idxs: Vec<usize>) -> Option<&E>;
 
@@ -35,10 +35,10 @@ where
 
     fn transpose(&self) -> Self;
 
-    //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
+    fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
 
-    ///// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
-    ///// vector")
+    /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
+    /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self;
 }
 
