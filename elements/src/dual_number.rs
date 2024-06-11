@@ -59,9 +59,9 @@ impl MulAssign for DualNumber {
 
 impl Div for DualNumber {
     type Output = Self;
-    //  (x + yi) / (a + bi)
-    //  = (x + yi)(a - bi) / ((a + bi)(a-bi))
-    //  = (ax + (ay - xb)i) / (a**2)
+    //  (x + ye) / (a + be)
+    //  = (x + ye)(a - be) / ((a + be)(a - be))
+    //  = (ax + (ay - xb)e) / (a**2)
     fn div(self, rhs: Self) -> Self::Output {
         let denom = self.real * self.real;
         let real = (self.real * rhs.real) / denom;
@@ -109,7 +109,9 @@ impl RealElement for DualNumber {}
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
+    use float_cmp::assert_approx_eq;
 
     #[test]
     fn test_dual() {
@@ -128,6 +130,7 @@ mod tests {
     fn test_cube() {
         let dual_number = DualNumber::new(0.1, 1.);
         let result = cube(dual_number);
-        println!("{}", result);
+        assert_approx_eq!(f64, result.real, 0.001);
+        assert_approx_eq!(f64, result.dual, 0.03);
     }
 }
