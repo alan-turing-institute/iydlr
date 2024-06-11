@@ -2,6 +2,7 @@ use std::{
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul},
 };
+use num::traits::Zero;
 
 use crate::utils::{Exp, Ln, Pow};
 
@@ -44,7 +45,7 @@ where
 
 /// Collection of traits required by the elements of a Tensor.
 pub trait Element:
-    Debug + Clone + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self>
+    Debug + Clone + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self> + Zero
 {
 }
 
