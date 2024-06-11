@@ -7,8 +7,9 @@ use interfaces::{
     tensors::{Element, RealElement},
     utils::{Exp, Ln, Pow},
 };
+use num_traits::identities::Zero;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DualNumber {
     pub real: f64,
     pub dual: f64,
@@ -103,14 +104,20 @@ impl Pow for DualNumber {
     }
 }
 
+impl Zero for DualNumber {
+    fn zero() -> Self {
+        Self::new(0., 0.)
+    }
+    fn is_zero(&self) -> bool {
+        self.real == 0. && self.dual == 0.
+    }
+}
+
 impl Element for DualNumber {}
 
 impl RealElement for DualNumber {
     fn neg_inf() -> Self {
         Self::new(-f64::INFINITY, 0.)
-    }
-    fn zero() -> Self {
-        Self::new(0., 0.)
     }
 }
 
