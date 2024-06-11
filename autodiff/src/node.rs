@@ -393,34 +393,6 @@ mod tests {
         assert_eq!((*ref_a).borrow().grad().unwrap(), 20.0_f64);
         assert!((*ref_b).borrow().grad().is_some());
         assert_eq!((*ref_b).borrow().grad().unwrap(), 20.0_f64);
-
-        // match &node_f {
-        //     Node::Prod(_, _, (d, c)) => {
-        //         assert!(d.borrow().grad().is_some());
-        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
-        //         assert!(c.borrow().grad().is_some());
-        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
-        //     }
-        //     _ => panic!(),
-        // }
-        // match &node_f {
-        //     Node::Prod(_, _, (d, c)) => {
-        //         assert!(d.borrow().grad().is_some());
-        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
-        //         match d.borrow().deref() {
-        //             Node::Sum(_, _, (a, b)) => {
-        //                 assert!(a.borrow().grad().is_some());
-        //                 assert_eq!(a.borrow().grad().unwrap(), 20.0_f64);
-        //                 assert!(b.borrow().grad().is_some());
-        //                 assert_eq!(b.borrow().grad().unwrap(), 20.0_f64);
-        //             }
-        //             _ => panic!(),
-        //         }
-        //         assert!(c.borrow().grad().is_some());
-        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
-        //     }
-        //     _ => panic!(),
-        // }
     }
 
     #[test]
@@ -432,47 +404,62 @@ mod tests {
         let node_2_ = Node::new(2.0, None);
         let node_5 = Node::new(5.0, None);
 
-        let node_5x = node_5 * node_x.clone();
+        let node_5x = node_5 * node_x;
+
+        let (ref_5, ref_x) = match &node_5x {
+            Node::Prod(_, _, (n1, n2)) => (n1.clone(), n2.clone()),
+            _ => panic!(),
+        };
+
         let node_exp_5x = node_5x.exp();
-        let node_x_squared = node_x.pow(node_2);
+
+        let ref_5x = match &node_exp_5x {
+            Node::Exp(_, _, n) => n.clone(),
+            _ => panic!(),
+        };
+
+        let node_x_squared = (*ref_x).borrow().to_owned().pow(node_2);
+
+        let ref_2 = match &node_x_squared {
+            Node::Pow(_, _, (_, n2)) => n2.clone(),
+            _ => panic!(),
+        };
+
         let node_2x_squared = node_x_squared * node_2_;
 
+        let (ref_x_squared, ref_2_) = match &node_2x_squared {
+            Node::Prod(_, _, (n1, n2)) => (n1.clone(), n2.clone()),
+            _ => panic!(),
+        };
+
         let node_f = node_exp_5x + node_2x_squared;
+
+        let (ref_exp_5x, ref_2x_squared) = match &node_f {
+            Node::Sum(_, _, (n1, n2)) => (n1.clone(), n2.clone()),
+            _ => panic!(),
+        };
 
         let node_f = node_f.backward(1.0);
 
         // Check all grads have been populated.
         assert_eq!(node_f.grad().unwrap(), 1.0_f64);
 
-        // TODO FROM HERE.
-        // assert_eq!(node_x.borrow().grad().unwrap(), 0.0_f64);
+        // assert_eq!((*ref_exp_5x).borrow().grad().unwrap(), 0.0_f64); // TODO.
+        // assert_eq!((*ref_2x_squared).borrow().grad().unwrap(), 0.0_f64); // TODO.
 
-        // match &node_f {
-        //     Node::Prod(_, _, (d, c)) => {
-        //         assert!(d.borrow().grad().is_some());
-        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
-        //         assert!(c.borrow().grad().is_some());
-        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
-        //     }
-        //     _ => panic!(),
-        // }
-        // match &node_f {
-        //     Node::Prod(_, _, (d, c)) => {
-        //         assert!(d.borrow().grad().is_some());
-        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
-        //         match d.borrow().deref() {
-        //             Node::Sum(_, _, (a, b)) => {
-        //                 assert!(a.borrow().grad().is_some());
-        //                 assert_eq!(a.borrow().grad().unwrap(), 20.0_f64);
-        //                 assert!(b.borrow().grad().is_some());
-        //                 assert_eq!(b.borrow().grad().unwrap(), 20.0_f64);
-        //             }
-        //             _ => panic!(),
-        //         }
-        //         assert!(c.borrow().grad().is_some());
-        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
-        //     }
-        //     _ => panic!(),
-        // }
+        // assert_eq!((*ref_x_squared).borrow().grad().unwrap(), 0.0_f64); // TODO.
+        // assert_eq!((*ref_5x).borrow().grad().unwrap(), 0.0_f64); // TODO.
+
+        // assert_eq!((*ref_2).borrow().grad().unwrap(), 0.0_f64); // TODO.
+        // assert_eq!((*ref_2_).borrow().grad().unwrap(), 0.0_f64); // TODO.
+        // assert_eq!((*ref_5).borrow().grad().unwrap(), 0.0_f64); // TODO.
+
+        // df/dx = 4x + 5 exp(5x)
+        // With x = 3 this gives:
+        // df/dx(3) = 12 + 5 * exp(15) = 16345098.862360553196509
+        assert_eq!(
+            (*ref_x).borrow().grad().unwrap(),
+            16345098.862360553196509_f64
+        );
     }
 }
