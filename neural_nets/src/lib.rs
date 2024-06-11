@@ -1,6 +1,6 @@
+use attention::attention::concat;
 use interfaces::deep_learning::{DLModule, LinearLayer};
-use interfaces::tensors::Element;
-use interfaces::tensors::Tensor;
+use interfaces::tensors::{Element, Tensor};
 use rand::distributions::Distribution;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -21,8 +21,24 @@ where
 {
     type DLModuleError = <T as Tensor<E>>::TensorError;
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
+        let input_shape = x.shape();
         // The addition assumes broadcasting if x is a batch (b,i)
-        Ok(self.w.matmul(&x.clone().transpose())? + self.b.clone())
+        if input_shape.len() != 2 {
+            unimplemented!("gracefully handle inputs with other dims != 2")
+        }
+
+        // batch size = 1
+        if input_shape[0] == 1 {
+            return Ok(self.w.matmul(&x.clone().transpose())? + self.b.clone());
+        } else {
+            todo!()
+            // let mut b_concat = self.b.clone();
+
+            // for _ in 0..input_shape[0] {
+            //     b_concat = concat(b_concat, self.b.clone())
+            // }
+            // Ok(self.w.matmul(&x.clone().transpose())? + b_concat)
+        }
     }
     fn params(&self) -> Vec<E> {
         let mut res: Vec<E> = self.w.clone().into();
@@ -82,6 +98,18 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tensors::TensorImpl;
 
-    // #[test]s
+    #[test]
+    fn construct_lin_layer() {
+        let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 1, 0);
+    }
+
+    #[test]
+    fn lin_layer_forward() {
+        let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 1, 0);
+        let x = TensorImpl::from_vec(&vec![1, 2], &vec![6.0; 2]).unwrap();
+        println!("{:?}", x.shape());
+        layer.forward(&x);
+    }
 }
