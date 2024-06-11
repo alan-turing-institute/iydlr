@@ -2,6 +2,7 @@ use anyhow::Error;
 use interfaces::tensors::{Element, Tensor};
 use std::{fmt::Debug, ops::{Add, Mul}, vec::Vec};
 
+/// Implementation of multidimensional arrays as row major strided vectors.
 #[derive(Debug, Clone)]
 struct TensorImpl<E>
 where
@@ -117,12 +118,14 @@ where
     //fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut E>;
 
     fn transpose(&self) -> Self {
-        // Swap the last two elements of the shape vector
+        if self.shape.len() < 2 {
+            return self.clone();
+        }
         let mut shape = self.shape.clone();
         let num_dims = shape.len();
+        // Swap the last two elements of the shape vector
         shape.swap(num_dims - 1, num_dims - 2);
-        // TODO(mhauru) Cloning here feel unnecessary, can we get rid of it?
-        let leading_dims = shape.clone().into_iter().take(num_dims - 2).reduce(|a, b| a * b).unwrap();
+        let leading_dims = shape.iter().take(num_dims - 2).into_iter().product::<usize>();
 
         let n_elements = self.data.len();
         let mut data : Vec<E> = Vec::with_capacity(n_elements);
@@ -134,7 +137,7 @@ where
                 }
             }
         }
-        TensorImpl { shape, data }
+        return TensorImpl { shape, data };
     }
 
     //fn matmul(&self, other: &Self) -> Result<Self, Self::TensorError>;
