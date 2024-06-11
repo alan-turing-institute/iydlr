@@ -286,7 +286,7 @@ mod tests {
     // }
 
     #[test]
-    fn test_backward() {
+    fn test_backward_on_sum() {
         let node1 = Node::new(1.1, None);
         let node2 = Node::new(2.2, None);
 
@@ -311,6 +311,37 @@ mod tests {
                 assert_eq!(n1.grad().unwrap(), 5.0_f64);
                 assert!(n2.grad().is_some());
                 assert_eq!(n2.grad().unwrap(), 5.0_f64);
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn test_backward_on_prod() {
+        let node1 = Node::new(1.1, None);
+        let node2 = Node::new(2.2, None);
+
+        let node = node1 * node2;
+
+        assert!(node.grad().is_none());
+        match &node {
+            Node::Prod(_, _, (n1, n2)) => {
+                assert!(n1.grad().is_none());
+                assert!(n2.grad().is_none());
+            }
+            _ => panic!(),
+        }
+
+        let node = node.backward(5.0);
+
+        assert!(node.grad().is_some());
+        assert_eq!(node.grad().unwrap(), 5.0_f64);
+        match &node {
+            Node::Prod(_, _, (n1, n2)) => {
+                assert!(n1.grad().is_some());
+                assert_eq!(n1.grad().unwrap(), 11.0_f64);
+                assert!(n2.grad().is_some());
+                assert_eq!(n2.grad().unwrap(), 5.5_f64);
             }
             _ => panic!(),
         }
