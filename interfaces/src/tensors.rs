@@ -16,6 +16,7 @@ pub trait Tensor<E>:
     + Add<E, Output = Self>
     + Mul<Output = Self>
     + Mul<E, Output = Self>
+    + Into<Vec<E>>
     // + From<usize>
     // + From<f64>
 where
@@ -66,6 +67,19 @@ where
     // TODO(mhauru): Come back to this later.
     // fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
 }
+
+// impl<T> From<T> for Vec<f64>
+// where
+//     T: RealTensor,
+// {
+//     fn from(tensor: T) -> Self {
+//         let mut vec = Vec::new();
+//         for element in tensor.iter() {
+//             vec.push(element.to_f64());
+//         }
+//         vec
+//     }
+// }
 
 /// A Subtrait of `Element`, extending the trait to capture "real number like" behaviour.
 pub trait RealElement: Element + Exp + Pow + Ln + From<f64> {}
