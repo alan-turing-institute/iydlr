@@ -144,7 +144,40 @@ where
 
     ///// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     ///// vector")
-    //fn dim_sum(&self, dim: Vec<usize>) -> Self;
+    fn dim_sum(&self, dims: Vec<usize>) -> Self {
+        unimplemented!()
+    }
+}
+
+impl<E> TensorImpl<E>
+where
+    E: Element,
+{
+    ///// Sum across a single dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
+    ///// vector")
+    fn single_dim_sum(&self, dim: usize) -> Self {
+        if dim >= self.shape.len() {
+            panic!("The provided dimension is out of bounds.");
+        }
+
+        let leading_dims = self.shape.iter().take(dim).into_iter().product::<usize>();
+        let trailing_dims = self.shape.iter().skip(dim + 1).into_iter().product::<usize>();
+
+        // let mut sum = E::zero();
+
+        // for i in 0..self.shape.len() {
+        //     let include_dim: bool = i == dim;
+        //     println!("i: {}", i, );
+
+        //     for j in 0..self.shape[dim] {
+        //         let idx = leading_dims * self.shape[dim] * trailing_dims + j * trailing_dims;
+        //         sum += self.data[idx].clone();
+        //     }
+        // }
+
+        todo!()
+    }
+
 }
 
 #[cfg(test)]
@@ -306,4 +339,22 @@ mod tests {
         let tensor2 = tensor * 10;
         assert_eq!(tensor2.data, vec![10, 20, 30, 40, 50, 60]);
     }
+
+    #[test]
+    fn test_single_dim_sum() {
+        let shape = vec![2, 2];
+        let data = vec![1, 2, 3, 4];
+
+        let expected_row_sum = vec![1, 5];
+        let expected_col_sum = vec![2, 4];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+
+        // TODO confirm that `dim=0` is the correct index for row-wise sum
+        let actual_row_sum = tensor.single_dim_sum(0);
+        assert_eq!(actual_row_sum.data, expected_row_sum);
+
+        let actual_col_sum = tensor.single_dim_sum(1);
+        assert_eq!(actual_col_sum.data, expected_col_sum);
+    }
+
 }
