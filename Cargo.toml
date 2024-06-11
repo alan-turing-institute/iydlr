@@ -1,7 +1,5 @@
 [workspace]
 
-members = [
-    "attention", "interfaces", "tensors",
-]
+members = ["attention", "elements", "interfaces", "tensors"]
 
 resolver = "2"
