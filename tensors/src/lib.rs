@@ -8,7 +8,7 @@ use std::{
 
 /// Implementation of multidimensional arrays as row major strided vectors.
 #[derive(Debug, Clone, PartialEq)]
-struct TensorImpl<E>
+pub struct TensorImpl<E>
 where
     E: Element,
 {
@@ -335,12 +335,12 @@ where
         println!("leading_dims: {}", leading_dims);
         println!("trailing_dims: {}", trailing_dims);
 
-        let mut output_shape  = self.shape.clone();
+        let mut output_shape = self.shape.clone();
         output_shape[dim] = 1;
         let output_size = output_shape.iter().product::<usize>();
 
         let mut dim_sum: Vec<E> = Vec::new();
-        
+
         // Outer loop needs to iterate over the size of the new shape
         for i in 0..output_size {
             let mut sum: E = E::zero();
@@ -556,13 +556,13 @@ mod tests {
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
         let expected_col_sum = vec![2, 4];
-        let expected_col_shape = vec![1, 2]; 
+        let expected_col_shape = vec![1, 2];
         let actual_col_sum = tensor.single_dim_sum(0);
         assert_eq!(actual_col_sum.data, expected_col_sum);
         assert_eq!(actual_col_sum.shape, expected_col_shape);
 
         let expected_row_sum = vec![1, 5];
-        let expected_row_shape = vec![2, 1]; 
+        let expected_row_shape = vec![2, 1];
         let actual_row_sum = tensor.single_dim_sum(1);
         assert_eq!(actual_row_sum.data, expected_row_sum);
         assert_eq!(actual_row_sum.shape, expected_row_shape);
