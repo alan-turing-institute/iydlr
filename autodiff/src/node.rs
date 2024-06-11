@@ -1,9 +1,8 @@
 use std::{
     cell::RefCell,
     fmt::Display,
-    ops::{Add, AddAssign, Deref, Div, Mul},
+    ops::{Add, AddAssign, Div, Mul},
     rc::Rc,
-    thread,
 };
 
 use interfaces::{
@@ -215,9 +214,13 @@ impl<T: RealElement + From<f64>> RealElement for Node<T> {}
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::BorrowMut;
+    use std::{
+        borrow::{Borrow, BorrowMut},
+        ops::Deref,
+    };
 
     use super::*;
+    use std::borrow::Cow;
 
     #[test]
     fn test_new() {
@@ -300,28 +303,25 @@ mod tests {
 
         let node = node1 + node2;
 
-        assert!(node.grad().is_none());
-        match &node {
-            Node::Sum(_, _, (n1, n2)) => {
-                assert!(n1.borrow().grad().is_none());
-                assert!(n2.borrow().grad().is_none());
-            }
+        let (ref1, ref2) = match &node {
+            Node::Sum(_, _, (n1, n2)) => (n1.clone(), n2.clone()),
             _ => panic!(),
-        }
+        };
+
+        assert!(node.grad().is_none());
+
+        assert!((*ref1).borrow().grad().is_none());
+        assert!((*ref2).borrow().grad().is_none());
 
         let node = node.backward(5.0);
 
         assert!(node.grad().is_some());
         assert_eq!(node.grad().unwrap(), 5.0_f64);
-        match &node {
-            Node::Sum(_, _, (n1, n2)) => {
-                assert!(n1.borrow().grad().is_some());
-                assert_eq!(n1.borrow().grad().unwrap(), 5.0_f64);
-                assert!(n2.borrow().grad().is_some());
-                assert_eq!(n2.borrow().grad().unwrap(), 5.0_f64);
-            }
-            _ => panic!(),
-        }
+
+        assert!((*ref1).borrow().grad().is_some());
+        assert_eq!((*ref1).borrow().grad().unwrap(), 5.0_f64);
+        assert!((*ref2).borrow().grad().is_some());
+        assert_eq!((*ref2).borrow().grad().unwrap(), 5.0_f64);
     }
 
     #[test]
@@ -331,28 +331,24 @@ mod tests {
 
         let node = node1 * node2;
 
-        assert!(node.grad().is_none());
-        match &node {
-            Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.borrow().grad().is_none());
-                assert!(n2.borrow().grad().is_none());
-            }
+        let (ref1, ref2) = match &node {
+            Node::Prod(_, _, (n1, n2)) => (n1.clone(), n2.clone()),
             _ => panic!(),
-        }
+        };
+
+        assert!(node.grad().is_none());
+        assert!((*ref1).borrow().grad().is_none());
+        assert!((*ref2).borrow().grad().is_none());
 
         let node = node.backward(5.0);
 
         assert!(node.grad().is_some());
         assert_eq!(node.grad().unwrap(), 5.0_f64);
-        match &node {
-            Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.borrow().grad().is_some());
-                assert_eq!(n1.borrow().grad().unwrap(), 11.0_f64);
-                assert!(n2.borrow().grad().is_some());
-                assert_eq!(n2.borrow().grad().unwrap(), 5.5_f64);
-            }
-            _ => panic!(),
-        }
+
+        assert!((*ref1).borrow().grad().is_some());
+        assert_eq!((*ref1).borrow().grad().unwrap(), 11.0_f64);
+        assert!((*ref2).borrow().grad().is_some());
+        assert_eq!((*ref2).borrow().grad().unwrap(), 5.5_f64);
     }
 
     #[test]
@@ -362,66 +358,69 @@ mod tests {
         let node_c = Node::new(2.0, None);
 
         let node_d = node_a + node_b;
+
+        let (ref_a, ref_b) = match &node_d {
+            Node::Sum(_, _, (n1, n2)) => (n1.clone(), n2.clone()),
+            _ => panic!(),
+        };
+
         let node_f = node_d * node_c;
+
+        let (ref_d, ref_c) = match &node_f {
+            Node::Prod(_, _, (n1, n2)) => (n1.clone(), n2.clone()),
+            _ => panic!(),
+        };
 
         // Check all grads are None initially.
         assert!(node_f.grad().is_none());
-        match &node_f {
-            Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.borrow().grad().is_none());
-                assert!(n2.borrow().grad().is_none());
-            }
-            _ => panic!(),
-        }
-        match &node_f {
-            Node::Prod(_, _, (n1, n2)) => {
-                assert!(n1.borrow().grad().is_none());
-                match n1.borrow().deref() {
-                    Node::Sum(_, _, (n11, n12)) => {
-                        assert!(n11.borrow().grad().is_none());
-                        assert!(n12.borrow().grad().is_none());
-                    }
-                    _ => panic!(),
-                }
-                assert!(n2.borrow().grad().is_none());
-            }
-            _ => panic!(),
-        }
+        assert!((*ref_a).borrow().grad().is_none());
+        assert!((*ref_b).borrow().grad().is_none());
+        assert!((*ref_c).borrow().grad().is_none());
+        assert!((*ref_d).borrow().grad().is_none());
 
         let node_f = node_f.backward(10.0);
 
         // Check all grads have been populated.
-
         assert!(node_f.grad().is_some());
         assert_eq!(node_f.grad().unwrap(), 10.0_f64);
 
-        match &node_f {
-            Node::Prod(_, _, (d, c)) => {
-                assert!(d.borrow().grad().is_some());
-                assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
-                assert!(c.borrow().grad().is_some());
-                assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
-            }
-            _ => panic!(),
-        }
-        match &node_f {
-            Node::Prod(_, _, (d, c)) => {
-                assert!(d.borrow().grad().is_some());
-                assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
-                match d.borrow().deref() {
-                    Node::Sum(_, _, (a, b)) => {
-                        assert!(a.borrow().grad().is_some());
-                        assert_eq!(a.borrow().grad().unwrap(), 20.0_f64);
-                        assert!(b.borrow().grad().is_some());
-                        assert_eq!(b.borrow().grad().unwrap(), 20.0_f64);
-                    }
-                    _ => panic!(),
-                }
-                assert!(c.borrow().grad().is_some());
-                assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
-            }
-            _ => panic!(),
-        }
+        assert!((*ref_d).borrow().grad().is_some());
+        assert_eq!((*ref_d).borrow().grad().unwrap(), 20.0_f64);
+        assert!((*ref_c).borrow().grad().is_some());
+        assert_eq!((*ref_c).borrow().grad().unwrap(), 50.0_f64);
+
+        assert!((*ref_a).borrow().grad().is_some());
+        assert_eq!((*ref_a).borrow().grad().unwrap(), 20.0_f64);
+        assert!((*ref_b).borrow().grad().is_some());
+        assert_eq!((*ref_b).borrow().grad().unwrap(), 20.0_f64);
+
+        // match &node_f {
+        //     Node::Prod(_, _, (d, c)) => {
+        //         assert!(d.borrow().grad().is_some());
+        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
+        //         assert!(c.borrow().grad().is_some());
+        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
+        //     }
+        //     _ => panic!(),
+        // }
+        // match &node_f {
+        //     Node::Prod(_, _, (d, c)) => {
+        //         assert!(d.borrow().grad().is_some());
+        //         assert_eq!(d.borrow().grad().unwrap(), 20.0_f64);
+        //         match d.borrow().deref() {
+        //             Node::Sum(_, _, (a, b)) => {
+        //                 assert!(a.borrow().grad().is_some());
+        //                 assert_eq!(a.borrow().grad().unwrap(), 20.0_f64);
+        //                 assert!(b.borrow().grad().is_some());
+        //                 assert_eq!(b.borrow().grad().unwrap(), 20.0_f64);
+        //             }
+        //             _ => panic!(),
+        //         }
+        //         assert!(c.borrow().grad().is_some());
+        //         assert_eq!(c.borrow().grad().unwrap(), 50.0_f64);
+        //     }
+        //     _ => panic!(),
+        // }
     }
 
     #[test]
@@ -443,7 +442,10 @@ mod tests {
         let node_f = node_f.backward(1.0);
 
         // Check all grads have been populated.
-        // assert_eq!(node_f.grad().unwrap(), 1.0_f64);
+        assert_eq!(node_f.grad().unwrap(), 1.0_f64);
+
+        // TODO FROM HERE.
+        // assert_eq!(node_x.borrow().grad().unwrap(), 0.0_f64);
 
         // match &node_f {
         //     Node::Prod(_, _, (d, c)) => {
