@@ -316,19 +316,32 @@ where
             .into_iter()
             .product::<usize>();
 
-        // let mut sum = E::zero();
+        println!("leading_dims: {}", leading_dims);
+        println!("trailing_dims: {}", trailing_dims);
 
-        // for i in 0..self.shape.len() {
-        //     let include_dim: bool = i == dim;
-        //     println!("i: {}", i, );
+        let mut output_shape  = self.shape.clone();
+        output_shape[dim] = 1;
+        let output_size = output_shape.iter().product::<usize>();
 
-        //     for j in 0..self.shape[dim] {
-        //         let idx = leading_dims * self.shape[dim] * trailing_dims + j * trailing_dims;
-        //         sum += self.data[idx].clone();
-        //     }
-        // }
+        let mut dim_sum: Vec<E> = Vec::new();
+        
+        // Outer loop needs to iterate over the size of the new shape
+        for i in 0..output_size {
+            let mut sum: E = E::zero();
+            for (j, value) in self.data.iter().enumerate() {
+                // print value of i, j and value
+                if j % self.shape[dim] == i {
+                    sum += value.clone();
+                }
+                println!("i: {}, j: {}, value: {}, sum: {}", i, j, value, sum);
+            }
+            dim_sum.push(sum);
+        }
 
-        todo!()
+        TensorImpl {
+            shape: output_shape,
+            data: dim_sum,
+        }
     }
 }
 
@@ -524,17 +537,19 @@ mod tests {
     fn test_single_dim_sum() {
         let shape = vec![2, 2];
         let data = vec![1, 2, 3, 4];
-
-        let expected_row_sum = vec![1, 5];
-        let expected_col_sum = vec![2, 4];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
-        // TODO confirm that `dim=0` is the correct index for row-wise sum
-        let actual_row_sum = tensor.single_dim_sum(0);
-        assert_eq!(actual_row_sum.data, expected_row_sum);
-
-        let actual_col_sum = tensor.single_dim_sum(1);
+        let expected_col_sum = vec![2, 4];
+        let expected_col_shape = vec![1, 2]; 
+        let actual_col_sum = tensor.single_dim_sum(0);
         assert_eq!(actual_col_sum.data, expected_col_sum);
+        assert_eq!(actual_col_sum.shape, expected_col_shape);
+
+        let expected_row_sum = vec![1, 5];
+        let expected_row_shape = vec![2, 1]; 
+        let actual_row_sum = tensor.single_dim_sum(1);
+        assert_eq!(actual_row_sum.data, expected_row_sum);
+        assert_eq!(actual_row_sum.shape, expected_row_shape);
     }
 
     #[test]

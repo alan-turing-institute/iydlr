@@ -51,6 +51,7 @@ pub trait Element:
 {
 }
 
+
 /// A Subtrait of `Tensor`, extending the interface to include methods that require more
 /// "real number like" behaviour from the tensor elements. The `RealTensor` element must be an
 /// implementer of the `RealElement` trait.
