@@ -60,23 +60,21 @@ where
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
-        // let masked_x: T = self.mask.forward(x)?;
-        let masked_x: T = self.mask * x.clone(); // element-wise multiplication
+        let mut outputs: Vec<T> = vec![];
+        let masked_x: T = self.mask.clone() * x.clone(); // element-wise multiplication
         for attention_head_idx in 0..self.num_heads {
+            // TODO: fix unwraps once error conversion is handled
             let query = self.query_weights[attention_head_idx].forward(x).unwrap(); // just a matmul, Unwrap used since we currently do not have conversion implemented
             let key: T = self.key_weights[attention_head_idx].forward(x).unwrap();
             let value: T = self.value_weights[attention_head_idx].forward(x).unwrap();
-            let last_dim_of_keys = key.shape().last().unwrap();
-            // let last_dim_of_keys = key.shape().last().ok_or(anyhow!("Empty dim"))?;
-            // let att: T = query.matmul(&key.transpose()) * 1 / sqrtf64(last_dim_of_keys)?; // make sure only last two dimensions are transposed
-            // let att: T = query.matmul(&key.transpose()).unwrap() * 1. / E::sqrt(last_dim_of_keys);
-
-            // Here:
-            let att: T = query.matmul(&key.transpose()).unwrap() * E::from(1.)
+            let last_dim_of_keys = *key.shape().last().unwrap();
+            let att: T = query.matmul(&key.transpose()).unwrap()
+                * (E::from(1.)
                 // TODO: make this safer
-                / E::from((*last_dim_of_keys as f64).powf(-0.5));
-            // matmul with V
-            let att_v: T = att.matmul(&value);
+                / E::from((last_dim_of_keys as f64).powf(-0.5))); // make sure only last two dimensions are transposed
+                                                                  // matmul with V
+            let att_v: T = att.matmul(&value).unwrap();
+            outputs.push(att_v);
         }
         // make sure only last two dimensions are transposed
         todo!()
