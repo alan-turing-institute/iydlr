@@ -55,7 +55,7 @@ impl<T: RealElement + From<f64>> Node<T> {
 
     // TODO: update to more like add_assign than overwrite.
     pub fn set_grad(&mut self, new_grad: T) {
-        let g = match self {
+        let g: &mut Option<T> = match self {
             Node::Sum(_, grad, _)
             | Node::Prod(_, grad, _)
             | Node::Exp(_, grad, _)
@@ -486,15 +486,33 @@ mod tests {
         // Check all grads have been populated.
         assert_eq!(node_f.grad().unwrap(), 1.0_f64);
 
-        // assert_eq!((*ref_exp_5x).borrow().grad().unwrap(), 0.0_f64); // TODO.
-        // assert_eq!((*ref_2x_squared).borrow().grad().unwrap(), 0.0_f64); // TODO.
+        // w.r.t. the exp(5x) node the grad is 1.
+        assert_eq!((*ref_exp_5x).borrow().grad().unwrap(), 1.0_f64);
 
-        // assert_eq!((*ref_x_squared).borrow().grad().unwrap(), 0.0_f64); // TODO.
-        // assert_eq!((*ref_5x).borrow().grad().unwrap(), 0.0_f64); // TODO.
+        // w.r.t. the 2x^2 node the grad is 1.
+        assert_eq!((*ref_2x_squared).borrow().grad().unwrap(), 1.0_f64);
 
-        // assert_eq!((*ref_2).borrow().grad().unwrap(), 0.0_f64); // TODO.
-        // assert_eq!((*ref_2_).borrow().grad().unwrap(), 0.0_f64); // TODO.
-        // assert_eq!((*ref_5).borrow().grad().unwrap(), 0.0_f64); // TODO.
+        // w.r.t. the x^2 node the grad is 2.
+        assert_eq!((*ref_x_squared).borrow().grad().unwrap(), 2.0_f64);
+
+        // w.r.t. the 5x node the grad is exp(5*3)
+        assert_eq!(
+            (*ref_5x).borrow().grad().unwrap(),
+            3269017.372472110639302_f64
+        );
+
+        // w.r.t. the 2 node that is the exponent of x^2, the grad is 3^2 * ln(3) = 9.887510598012987.
+        // TODO: why not 2 times this???
+        assert_eq!((*ref_2).borrow().grad().unwrap(), 9.887510598012987_f64);
+
+        // w.r.t. the 2 node that multiplies the x^2, the grad is 3^2:
+        assert_eq!((*ref_2_).borrow().grad().unwrap(), 9.0_f64);
+
+        // w.r.t. the 5 node that multiplies the x, the grad is 3 * e^(5*3) =
+        assert_eq!(
+            (*ref_5).borrow().grad().unwrap(),
+            9807052.117416331917906_f64
+        );
 
         // df/dx = 4x + 5 exp(5x)
         // With x = 3 this gives:
