@@ -189,17 +189,13 @@ where
         
         // Loop over the elements in the order of new_data.
         let strides = self.strides();
-        dbg!(&self.shape);
-        dbg!(&strides);
-        let lead_stride = strides[num_dims - 2] * strides[num_dims - 1];
-        dbg!(lead_stride);
+        let lead_stride = if (num_dims > 2) { strides[num_dims-3] } else { 1 };
         for i in 0..lead_dim {
             for j in 0..new_shape[num_dims - 2] {
                 for k in 0..new_shape[num_dims - 1] {
                     // Find the data index of this element in the original matrix.
                     // Note the reversal of the roles of k an j.
                     let transposed_idx = i * lead_stride + k * strides[num_dims-2] + j * strides[num_dims-1];
-                    dbg!(&transposed_idx);
                     new_data.push(self.data[transposed_idx].clone());
                 }
             }
@@ -340,6 +336,32 @@ mod tests {
         assert_eq!(transposed_twice.shape(), shape);
         assert_eq!(transposed_twice.data, original_data);
     }
+
+    #[test]
+    fn test_at() {
+        let shape = vec![3, 2, 2];
+        let original_data = (1..13).collect::<Vec<i32>>();
+        let tensor = TensorImpl::from_vec(&shape, &original_data).unwrap();
+
+        assert_eq!(*tensor.at(vec![0, 0, 0]).unwrap(), 1);
+        assert_eq!(*tensor.at(vec![2, 1, 1]).unwrap(), 12);
+        assert_eq!(tensor.at(vec![2, 1, 2]), None);
+        assert_eq!(*tensor.at(vec![1, 1, 0]).unwrap(), 7);
+        assert_eq!(*tensor.at(vec![1, 0, 1]).unwrap(), 6);
+    }
+
+    #[test]
+    fn test_at_mut() {
+        let shape = vec![3, 2, 2];
+        let original_data = (1..13).collect::<Vec<i32>>();
+        let mut tensor = TensorImpl::from_vec(&shape, &original_data).unwrap();
+
+        let index = vec![2, 0, 1];
+        let element = tensor.at_mut(index.clone()).unwrap();
+        *element = 100;
+        assert_eq!(*tensor.at(index.clone()).unwrap(), 100);
+    }
+
 
     // Addition
     #[test]
