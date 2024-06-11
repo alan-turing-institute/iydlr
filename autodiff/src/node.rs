@@ -1,6 +1,7 @@
 use std::{
+    cell::RefCell,
     fmt::Display,
-    ops::{Add, AddAssign, Div, Mul},
+    ops::{Add, AddAssign, Deref, Div, Mul},
 };
 
 use interfaces::{
@@ -8,19 +9,22 @@ use interfaces::{
     utils::{Exp, Ln, Pow},
 };
 
+type Ptr<N> = Box<N>;
+// type Ptr<N> = Rc<RefCell<N>>;
+
 /// A node in a computation graph.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Node<T> {
-    // Use Box<Node<T>> not Rc<Node<T>> because we do not need multiple ownership.
-    Sum(T, Option<T>, (Box<Node<T>>, Box<Node<T>>)),
-    Prod(T, Option<T>, (Box<Node<T>>, Box<Node<T>>)),
-    Exp(T, Option<T>, Box<Node<T>>),
-    Ln(T, Option<T>, Box<Node<T>>),
-    Pow(T, Option<T>, (Box<Node<T>>, Box<Node<T>>)),
+    // Replace Box<Node<T>> with Rc<Node<T>> if/when we need multiple ownership of nodes/subgraphs.
+    Sum(T, Option<T>, (Ptr<Node<T>>, Ptr<Node<T>>)),
+    Prod(T, Option<T>, (Ptr<Node<T>>, Ptr<Node<T>>)),
+    Exp(T, Option<T>, Ptr<Node<T>>),
+    Ln(T, Option<T>, Ptr<Node<T>>),
+    Pow(T, Option<T>, (Ptr<Node<T>>, Ptr<Node<T>>)),
     Leaf(T, Option<T>),
 }
 
-impl<T: Add> Node<T> {
+impl<T: RealElement + From<f64>> Node<T> {
     pub fn new(val: T, grad: Option<T>) -> Self {
         Node::Leaf(val, grad)
     }
@@ -47,6 +51,7 @@ impl<T: Add> Node<T> {
         }
     }
 
+    // TODO: update to more like add_assign than overwrite.
     pub fn set_grad(&mut self, new_grad: T) {
         let g = match self {
             Node::Sum(_, grad, _)
@@ -60,18 +65,60 @@ impl<T: Add> Node<T> {
         *g = Some(new_grad);
     }
 
-    // // Propagate a given gradient on the `grad` of each associated Node.
-    // pub fn backward(&self, gradient: T) {
-    //     match self {
-    //         Node::Sum(val, grad, (n1, n2)) => {
-    //             *n1.grad().borrow_mut()
-    //         }
-    //         _ => todo!(),
-    //     }
-    // }
+    // Set the gradient and initiate backward propagation.
+    pub fn backward(mut self, gradient: T) -> Self {
+        self.set_grad(gradient);
+        self.propagate_backward();
+        self
+    }
+
+    // Propagate a given gradient on the `grad` of each associated Node.
+    // Assumes the `grad` on self is not None.
+    pub fn propagate_backward(&mut self) {
+        let self_val = self.val().clone();
+        let self_grad = <Option<T> as Clone>::clone(&self.grad()).unwrap();
+
+        match self {
+            Node::Sum(_, _, (ref mut n1, ref mut n2)) => {
+                n1.set_grad(self_grad.to_owned());
+                n2.set_grad(self_grad.to_owned());
+                n1.propagate_backward();
+                n2.propagate_backward(); // TODO: spawn new thread.
+            }
+            Node::Prod(_, _, (ref mut n1, ref mut n2)) => {
+                n1.set_grad(n2.val().to_owned() * self_grad.clone());
+                n2.set_grad(n1.val().to_owned() * self_grad);
+                n1.propagate_backward();
+                n2.propagate_backward(); // TODO: spawn new thread.
+            }
+            Node::Exp(_, _, ref mut n) => {
+                n.set_grad(self_val);
+                n.propagate_backward();
+            }
+            Node::Ln(_, _, ref mut n) => {
+                n.set_grad(<f64 as Into<T>>::into(1_f64) / self_val);
+                n.propagate_backward();
+            }
+            // Node::Ln(_, _, ref mut n) => n.set_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
+            Node::Pow(_, _, (ref mut n1, ref mut n2)) => {
+                // exponent . base^(exponent - 1)
+                n1.set_grad(
+                    n2.val().to_owned()
+                        * n1.val()
+                            .clone()
+                            .pow(n2.val().to_owned() + <f64 as Into<T>>::into(-1_f64)),
+                );
+                // base^exponent . ln(base)
+                n2.set_grad((n1.val().clone()).pow(n2.val().to_owned()) * n1.val().clone().ln());
+                n1.propagate_backward();
+                n2.propagate_backward(); // TODO: spawn new thread.
+            }
+            Node::Leaf(_, _) => {} // Do nothing.
+        }
+    }
 }
 
-impl<T: RealElement> Add<Node<T>> for Node<T> {
+impl<T: RealElement + From<f64>> Add<Node<T>> for Node<T> {
     type Output = Node<T>;
 
     fn add(self, _rhs: Node<T>) -> Node<T> {
@@ -83,7 +130,7 @@ impl<T: RealElement> Add<Node<T>> for Node<T> {
     }
 }
 
-impl<T: RealElement> Mul<Node<T>> for Node<T> {
+impl<T: RealElement + From<f64>> Mul<Node<T>> for Node<T> {
     type Output = Node<T>;
 
     fn mul(self, _rhs: Node<T>) -> Node<T> {
@@ -95,7 +142,7 @@ impl<T: RealElement> Mul<Node<T>> for Node<T> {
     }
 }
 
-impl<T: RealElement> Div<Node<T>> for Node<T> {
+impl<T: RealElement + From<f64>> Div<Node<T>> for Node<T> {
     type Output = Node<T>;
 
     fn div(self, _rhs: Node<T>) -> Node<T> {
@@ -108,24 +155,24 @@ impl<T: RealElement> Div<Node<T>> for Node<T> {
     }
 }
 
-impl<T: RealElement> Exp for Node<T> {
+impl<T: RealElement + From<f64>> Exp for Node<T> {
     fn exp(self) -> Self {
         Node::Exp(self.val().clone().exp(), None, self.into())
     }
 }
 
-impl<T: RealElement> Ln for Node<T> {
+impl<T: RealElement + From<f64>> Ln for Node<T> {
     fn ln(self) -> Self {
         Node::Exp(self.val().clone().ln(), None, self.into())
     }
 }
 
-impl<T: RealElement> Pow for Node<T> {
-    fn pow(self, exp: Node<T>) -> Node<T> {
+impl<T: RealElement + From<f64>> Pow for Node<T> {
+    fn pow(self, exponent: Node<T>) -> Node<T> {
         Node::Pow(
-            self.val().clone().pow(exp.val().clone()), // Note: unnecessary clone of exp.val() here?
+            self.val().clone().pow(exponent.val().clone()), // Note: unnecessary clone of exp.val() here?
             None,
-            (self.into(), exp.into()),
+            (self.into(), exponent.into()), // Base in position 1, exponent in position 2.
         )
     }
 }
@@ -142,8 +189,22 @@ impl<T: RealElement> Display for Node<T> {
     }
 }
 
-impl<T: RealElement> Element for Node<T> {}
-impl<T: RealElement> RealElement for Node<T> {}
+impl<T: RealElement> Clone for Node<T> {
+    fn clone(&self) -> Self {
+        todo!();
+        match self {
+            Self::Sum(arg0, arg1, arg2) => Self::Sum(arg0.clone(), arg1.clone(), arg2.clone()),
+            Self::Prod(arg0, arg1, arg2) => Self::Prod(arg0.clone(), arg1.clone(), arg2.clone()),
+            Self::Exp(arg0, arg1, arg2) => Self::Exp(arg0.clone(), arg1.clone(), arg2.clone()),
+            Self::Ln(arg0, arg1, arg2) => Self::Ln(arg0.clone(), arg1.clone(), arg2.clone()),
+            Self::Pow(arg0, arg1, arg2) => Self::Pow(arg0.clone(), arg1.clone(), arg2.clone()),
+            Self::Leaf(arg0, arg1) => Self::Leaf(arg0.clone(), arg1.clone()),
+        }
+    }
+}
+
+impl<T: RealElement + From<f64>> Element for Node<T> {}
+impl<T: RealElement + From<f64>> RealElement for Node<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -223,23 +284,31 @@ mod tests {
     //     println!("{}", node);
     // }
 
-    // #[test]
-    // fn test_backward() {
-    //     let node1 = Node::new(1.1, None);
-    //     let node2 = Node::new(2.2, None);
+    #[test]
+    fn test_backward() {
+        let node1 = Node::new(1.1, None);
+        let node2 = Node::new(2.2, None);
 
-    //     let ref1 = node1.clone();
-    //     let ref2 = node2.clone();
+        let node = node1 + node2;
 
-    //     let node = node1 + node2;
+        match &node {
+            Node::Sum(_, _, (n1, n2)) => {
+                assert!(n1.grad().is_none());
+                assert!(n2.grad().is_none());
+            }
+            _ => panic!(),
+        }
 
-    //     assert_eq!(ref1.grad(), None);
-    //     assert_eq!(ref2.grad(), None);
+        let node = node.backward(5.0);
 
-    //     node.backward(5.5);
-
-    //     // TODO:
-    //     assert_eq!(ref1.grad(), Some(&0.1));
-    //     assert_eq!(ref2.grad(), Some(&0.2));
-    // }
+        match &node {
+            Node::Sum(_, _, (n1, n2)) => {
+                assert!(n1.grad().is_some());
+                assert_eq!(n1.grad().unwrap(), 5.0_f64);
+                assert!(n2.grad().is_some());
+                assert_eq!(n2.grad().unwrap(), 5.0_f64);
+            }
+            _ => panic!(),
+        }
+    }
 }
