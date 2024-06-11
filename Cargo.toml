@@ -1,12 +1,7 @@
 [workspace]
 
 members = [
-<<<<<<< Updated upstream
     "attention", "interfaces", "tensors",
-=======
-    "attention",
-    "interfaces",
->>>>>>> Stashed changes
 ]
 
 resolver = "2"
