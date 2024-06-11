@@ -59,6 +59,13 @@ impl<E: Element> TensorImpl<E> {
     //}
 }
 
+// TODO: add implementation for flattening TensorImpl into a vector of elements.
+impl<E: Element> From<TensorImpl<E>> for Vec<E> {
+    fn from(value: TensorImpl<E>) -> Self {
+        todo!()
+    }
+}
+
 /// Adding to two tensors together.
 impl<E: Element> Add for TensorImpl<E> {
     type Output = Self;
