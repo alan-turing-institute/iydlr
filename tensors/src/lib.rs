@@ -1,6 +1,10 @@
 use anyhow::Error;
 use interfaces::tensors::{Element, Tensor};
-use std::{fmt::Debug, ops::{Add, Mul}, vec::Vec};
+use std::{
+    fmt::Debug,
+    ops::{Add, Mul},
+    vec::Vec,
+};
 
 /// Implementation of multidimensional arrays as row major strided vectors.
 #[derive(Debug, Clone)]
@@ -11,6 +15,12 @@ where
     shape: Vec<usize>,
     data: Vec<E>,
 }
+
+// impl<E> From<usize> for TensorImpl<E> {
+//     fn from(value: usize) -> Self {
+//         todo!()
+//     }
+// }
 
 /// Adding to two tensors together.
 impl<E: Element> Add for TensorImpl<E> {
@@ -99,8 +109,8 @@ where
             ));
         } else {
             Ok(TensorImpl {
-                shape:shape.clone(),
-                data:data.clone()
+                shape: shape.clone(),
+                data: data.clone(),
             })
         }
     }
@@ -125,14 +135,19 @@ where
         let num_dims = shape.len();
         // Swap the last two elements of the shape vector
         shape.swap(num_dims - 1, num_dims - 2);
-        let leading_dims = shape.iter().take(num_dims - 2).into_iter().product::<usize>();
+        let leading_dims = shape
+            .iter()
+            .take(num_dims - 2)
+            .into_iter()
+            .product::<usize>();
 
         let n_elements = self.data.len();
-        let mut data : Vec<E> = Vec::with_capacity(n_elements);
+        let mut data: Vec<E> = Vec::with_capacity(n_elements);
         for i in 0..leading_dims {
             for j in 0..shape[num_dims - 2] {
                 for k in 0..shape[num_dims - 1] {
-                    let transposed_idx = i * shape[num_dims - 1] * shape[num_dims - 2] + k * shape[num_dims - 2] + j;
+                    let transposed_idx =
+                        i * shape[num_dims - 1] * shape[num_dims - 2] + k * shape[num_dims - 2] + j;
                     data.push(self.data[transposed_idx].clone());
                 }
             }
@@ -214,7 +229,6 @@ mod tests {
 
         let expected_data2 = vec![1, 3, 2, 4];
         assert_eq!(transposed2.data, expected_data2);
-
     }
 
     #[test]
@@ -235,7 +249,6 @@ mod tests {
         assert_eq!(transposed_twice.shape(), shape);
         assert_eq!(transposed_twice.data, original_data);
     }
-
 
     // Addition
     #[test]

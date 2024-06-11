@@ -16,6 +16,8 @@ pub trait Tensor<E>:
     + Add<E, Output = Self>
     + Mul<Output = Self>
     + Mul<E, Output = Self>
+    // + From<usize>
+    // + From<f64>
 where
     E: Element,
 {
@@ -66,7 +68,7 @@ where
 }
 
 /// A Subtrait of `Element`, extending the trait to capture "real number like" behaviour.
-pub trait RealElement: Element + Exp + Pow + Ln {}
+pub trait RealElement: Element + Exp + Pow + Ln + From<f64> {}
 
 // Below are some implementations of `Element` and `RealElement` "for free". This should facilitate
 // unit testing with these types.
