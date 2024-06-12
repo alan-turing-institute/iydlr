@@ -131,6 +131,89 @@ impl<E: Element> TensorImpl<E> {
             data: new_data,
         });
     }
+
+    fn add_same_shape(self, other: Self) -> Self {
+        let data: Vec<E> = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
+            .map(|(a, b)| a.clone() + b.clone())
+            .collect();
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+
+    fn add_broadcast(self, other: Self) -> Self {
+        if self.num_dims() != other.num_dims() {
+            panic!("Shapes are not compatible for element-wise operations.");
+        }
+        let num_dims = self.num_dims();
+        for i in 0..self.shape.len() {
+            if self.shape[i] != other.shape[i] && self.shape[i] != 1 && other.shape[i] != 1 {
+                panic!("Shapes are not compatible for element-wise operations.");
+            }
+        }
+
+        let new_shape: Vec<usize> = self
+            .shape
+            .iter()
+            .zip(other.shape.iter())
+            .map(|(a, b)| std::cmp::max(a, b).clone())
+            .collect();
+        let result_num_elements = num_elements_from_shape(&new_shape);
+        let mut new_data: Vec<E> = Vec::with_capacity(result_num_elements);
+
+        let mut self_idx: Vec<usize> = vec![0; num_dims];
+        let mut other_idx: Vec<usize> = vec![0; num_dims];
+        let mut result_idx: Vec<usize> = vec![0; num_dims];
+        let mut which_index_to_increment: usize;
+        while new_data.len() != result_num_elements {
+            dbg!("---");
+            dbg!(&self_idx);
+            dbg!(&other_idx);
+            dbg!(&result_idx);
+            let self_element = self.at(self_idx.clone()).unwrap();
+            let other_element = other.at(other_idx.clone()).unwrap();
+            //let result_element = result.at_mut(result_idx.clone()).unwrap();
+            //*result_element = self_element.clone() + other_element.clone();
+            new_data.push(self_element.clone() + other_element.clone());
+
+            // Increment the indices
+            which_index_to_increment = num_dims - 1;
+            while self_idx[which_index_to_increment] == self.shape[which_index_to_increment] - 1
+                && other_idx[which_index_to_increment] == other.shape[which_index_to_increment] - 1
+            {
+                if which_index_to_increment == 0 {
+                    break;
+                } else {
+                    which_index_to_increment -= 1;
+                }
+            }
+            dbg!(which_index_to_increment);
+            if self.shape[which_index_to_increment] != 1 {
+                self_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..(num_dims) {
+                self_idx[i] = 0;
+            }
+            if other.shape[which_index_to_increment] != 1 {
+                other_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..(num_dims) {
+                other_idx[i] = 0;
+            }
+            result_idx[which_index_to_increment] += 1;
+            for i in (which_index_to_increment + 1)..(num_dims) {
+                result_idx[i] = 0;
+            }
+        }
+        let result = Self {
+            shape: new_shape,
+            data: new_data,
+        };
+        return result;
+    }
 }
 
 impl<E: Element> IntoIterator for TensorImpl<E> {
@@ -153,19 +236,11 @@ impl<E: Element> Add for TensorImpl<E> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        if self.shape() != other.shape() {
-            panic!("Shapes are not compatible for element-wise operations.");
+        if self.shape() == other.shape() {
+            return self.add_same_shape(other);
+        } else {
+            return self.add_broadcast(other);
         }
-
-        let data: Vec<E> = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
-            .map(|(a, b)| a.clone() + b.clone())
-            .collect();
-        // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 }
 
@@ -1049,4 +1124,96 @@ mod tests {
         assert_eq!(result.data, expected_data);
     }
 
+    #[test]
+    fn test_add_broadcast() {
+        {
+            let shape1 = vec![2, 3, 2];
+            let data1 = (0..12).collect::<Vec<i32>>();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![1, 3, 2];
+            let data2 = (0..6).collect::<Vec<i32>>();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 2, 4, 6, 8, 10, 6, 8, 10, 12, 14, 16];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let shape1 = vec![2, 3, 2];
+            let data1 = (0..12).collect::<Vec<i32>>();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![2, 1, 2];
+            let data2 = (0..4).collect::<Vec<i32>>();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 2, 2, 4, 4, 6, 8, 10, 10, 12, 12, 14];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let shape1 = vec![2, 3, 2];
+            let data1 = (0..12).collect::<Vec<i32>>();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![2, 3, 1];
+            let data2 = (0..6).collect::<Vec<i32>>();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let shape1 = vec![2, 3, 2];
+            let data1 = (0..12).collect::<Vec<i32>>();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![2, 1, 1];
+            let data2 = (0..2).collect::<Vec<i32>>();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let shape1 = vec![2, 1, 3];
+            let data1 = (0..6).collect::<Vec<i32>>();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![1, 2, 1];
+            let data2 = (0..2).collect::<Vec<i32>>();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 2, 3];
+            let expected_data = vec![0, 1, 2, 1, 2, 3, 3, 4, 5, 4, 5, 6];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+    }
 }
