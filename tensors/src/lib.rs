@@ -130,7 +130,6 @@ impl<E: Element> TensorImpl<E> {
             data: new_data,
         });
     }
-
 }
 
 impl<E: Element> IntoIterator for TensorImpl<E> {
@@ -336,7 +335,8 @@ where
         let other_last_dim = *other.shape.last().unwrap();
 
         // Interleave the two flattened tensors in chunks equal to size of last dim of respective tensors
-        let new_data: Vec<E> = self.data
+        let new_data: Vec<E> = self
+            .data
             .chunks(self_last_dim)
             .zip(other.data.chunks(other_last_dim)) // yields items like (&[1.0, 2.0, 3.0], &[7.0, 8.0, 9.0])
             .flat_map(|(a, b)| a.into_iter().chain(b)) // chains to produce iterators like [1.0, 2.0, 3.0, 7.0, 8.0, 9.0]
@@ -826,8 +826,14 @@ mod tests {
         let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
         let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
 
-        let result1 = tensor3.matmul(&tensor1.concat(&tensor2, 1).unwrap()).unwrap();
-        let result2 = tensor3.matmul(&tensor1).unwrap().concat(&tensor3.matmul(&tensor2).unwrap(), 1).unwrap();
+        let result1 = tensor3
+            .matmul(&tensor1.concat(&tensor2, 1).unwrap())
+            .unwrap();
+        let result2 = tensor3
+            .matmul(&tensor1)
+            .unwrap()
+            .concat(&tensor3.matmul(&tensor2).unwrap(), 1)
+            .unwrap();
         assert_eq!(result1.shape, result2.shape);
         assert_eq!(result1.data, result2.data);
     }
