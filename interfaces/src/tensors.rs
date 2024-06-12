@@ -44,6 +44,8 @@ where
     /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self;
+
+    fn concat(&self, other: &Self, dim: usize) -> Result<Self, Self::TensorError>;
 }
 
 /// Collection of traits required by the elements of a Tensor.
