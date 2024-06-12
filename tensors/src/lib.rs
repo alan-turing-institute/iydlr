@@ -310,11 +310,12 @@ where
     /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self {
-        if dims.len() != 1 {
-            unimplemented!("Only single dimension sum is supported at the moment.");
-        } else {
-            return self.single_dim_sum(dims[0]);
+        // naive implementation, just looping over the dimensions
+        let mut result = self.clone();
+        for dim in dims {
+            result = result.single_dim_sum(dim);
         }
+        return result;
     }
 }
 
@@ -620,6 +621,27 @@ mod tests {
         let actual_row_sum = tensor.single_dim_sum(2);
         assert_eq!(actual_row_sum.data, expected_row_sum);
         assert_eq!(actual_row_sum.shape, expected_row_shape);
+    }
+
+    #[test]
+    fn test_multiple_dim_sum() {
+        let original_shape = vec![2, 3, 4, 5];
+        let original_data_len = original_shape.iter().product::<usize>();
+        let opiginal_data = (1..original_data_len + 1).collect::<Vec<usize>>();
+
+        let tensor = TensorImpl::from_vec(&original_shape, &opiginal_data).unwrap();
+
+        // Sum over dimensions 1 and 3
+        // The result should have shape [2, 1, 4, 1]
+        // The result should not be dependent of the order of the dimensions
+        let expected_shape = vec![2, 1, 4, 1];
+
+        let actual_sum_fwd = tensor.dim_sum(vec![1, 3]);
+        let actual_sum_bwd = tensor.dim_sum(vec![3, 1]);
+
+        assert_eq!(actual_sum_fwd.shape, expected_shape);
+        assert_eq!(actual_sum_bwd.shape, expected_shape);
+        assert_eq!(actual_sum_fwd.data, actual_sum_bwd.data);
     }
 
     #[test]
