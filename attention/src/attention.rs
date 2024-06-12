@@ -2,35 +2,6 @@ use interfaces::deep_learning::{DLModule, LinearLayer};
 use interfaces::tensors::{RealElement, RealTensor, Tensor};
 use std::marker::PhantomData;
 
-/// Interleaves last dimension of the input tensors and concatenates them along the last dimension.
-pub fn concat<E: RealElement, T: RealTensor<E>>(x: T, y: T) -> T {
-    let x_shape = x.shape();
-    let y_shape = y.shape();
-    // TODO: not sure why can't use Vec::from(), but does't compile
-    // let v_x: Vec<E> = Vec::<E>::from(x);
-    let v_x: Vec<E> = x.into();
-    let v_y: Vec<E> = y.into();
-    let x_last_dim = *x_shape.last().unwrap();
-    let y_last_dim = *y_shape.last().unwrap();
-
-    // Interleave the two flattened tensors in chunks equal to size of last dim of respective tensors
-    let output_vec: Vec<E> = v_x
-        .chunks(x_last_dim)
-        .zip(v_y.chunks(y_last_dim)) // yields items like (&[1.0, 2.0, 3.0], &[7.0, 8.0, 9.0])
-        .flat_map(|(a, b)| a.into_iter().chain(b)) // chains to produce iterators like [1.0, 2.0, 3.0, 7.0, 8.0, 9.0]
-        // TODO: consider adding a bound on copy
-        // .copied()
-        .cloned() // &f64 -> f64, optional
-        .collect();
-
-    // Convert output_vec into a tensor with required output shape
-    T::from_vec(
-        &vec![x_shape[0], x_shape[1], x_shape[2] + y_shape[2]],
-        &output_vec,
-    )
-    .unwrap()
-}
-
 pub trait MaskedSelfAttention<T, E>: DLModule<T, E>
 where
     T: Tensor<E>,
@@ -128,7 +99,10 @@ where
 
         // Concatanate over heads
         // TODO: check concat is channel-wise
-        Ok(outputs.into_iter().reduce(|acc, x| concat(acc, x)).unwrap())
+        Ok(outputs
+            .into_iter()
+            .reduce(|acc, x| acc.concat(&x, acc.shape().len() - 1).unwrap())
+            .unwrap())
     }
 
     fn params(&self) -> Vec<E> {
