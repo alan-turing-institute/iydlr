@@ -453,7 +453,7 @@ impl<E: RealElement> Ln for TensorImpl<E> {
 
 impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
-        todo!()
+        todo!();
         let data_exp = self.exp();
         let data_sum = data_exp.dim_sum(vec![dim]);
 
