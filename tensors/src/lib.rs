@@ -533,6 +533,14 @@ impl<E> TensorImpl<E>
 where
     E: Element,
 {
+    pub fn get_shape(&self) -> &Vec<usize> {
+        self.shape.as_ref()
+    }
+
+    pub fn get_data(&self) -> &Vec<E> {
+        self.data.as_ref()
+    }
+
     ///// Sum across a single dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     ///// vector")
     fn single_dim_sum(&self, dim: usize) -> Self {
