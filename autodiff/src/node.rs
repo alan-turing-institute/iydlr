@@ -84,7 +84,6 @@ impl<T: RealElement + From<f64>> NodePtr<T> {
         let self_grad = self.grad().unwrap();
         let self_val = self.val();
 
-        // TODO: check all these: why is there a factor self_grad in Sum & Prod but not elsewhere?
         match self.node() {
             Node::Sum(_, _, (ref mut np1, ref mut np2)) => {
                 np1.add_assign_grad(self_grad.clone());
@@ -99,11 +98,11 @@ impl<T: RealElement + From<f64>> NodePtr<T> {
                 np2.propagate_backward();
             }
             Node::Exp(_, _, ref mut np) => {
-                np.add_assign_grad(self_val);
+                np.add_assign_grad(self_grad * self_val);
                 np.propagate_backward();
             }
             Node::Ln(_, _, ref mut np) => {
-                np.add_assign_grad(<f64 as Into<T>>::into(1_f64) / self_val);
+                np.add_assign_grad(self_grad * <f64 as Into<T>>::into(1_f64) / self_val);
                 np.propagate_backward();
             }
             // Node::Ln(_, _, ref mut n) => n.add_assign_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
@@ -112,10 +111,10 @@ impl<T: RealElement + From<f64>> NodePtr<T> {
                 let b_val = np_b.val().clone();
                 let e_val = np_e.val().clone();
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
-                np_b.add_assign_grad(e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one));
+                np_b.add_assign_grad(self_grad.clone() * e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one));
 
                 // base^exponent . ln(base)
-                np_e.add_assign_grad(b_val.clone().pow(e_val.to_owned()) * b_val.ln());
+                np_e.add_assign_grad(self_grad * b_val.clone().pow(e_val.to_owned()) * b_val.ln());
                 np_b.propagate_backward();
                 np_e.propagate_backward();
             }
@@ -714,8 +713,8 @@ mod tests {
         // w.r.t. the 5x node the grad is exp(5*3)
         assert_eq!(node_5x.grad().unwrap(), 3269017.372472110639302_f64);
 
-        // w.r.t. the 2 node that is the exponent of x^2, the grad is 3^2 * ln(3) = 9.887510598012987.
-        assert_eq!(node_2.grad().unwrap(), 9.887510598012987_f64);
+        // w.r.t. the 2 node that is the exponent of x^2, the grad is 2 * 3^2 * ln(3) = 19.775021196025975.
+        assert_eq!(node_2.grad().unwrap(), 19.775021196025975_f64);
 
         // w.r.t. the 2 node that multiplies the x^2, the grad is 3^2:
         assert_eq!(node_2_.grad().unwrap(), 9.0_f64);
