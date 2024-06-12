@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fmt::Display,
-    ops::{Add, AddAssign, Div, Mul},
+    ops::{Add, AddAssign, Deref, Div, Mul},
     rc::Rc,
 };
 
@@ -13,6 +13,26 @@ use num_traits::Zero;
 
 // type Ptr<N> = Box<N>;
 type Ptr<N> = Rc<RefCell<N>>;
+
+pub struct NodePtr<T> {
+    ptr: Ptr<Node<T>>,
+}
+
+impl<T: RealElement + From<f64>> NodePtr<T> {
+    pub fn new(node: Node<T>) -> Self {
+        NodePtr {
+            ptr: Rc::new(RefCell::new(node)),
+        }
+    }
+
+    pub fn val(&self) -> T {
+        self.ptr.deref().borrow().val().clone()
+    }
+
+    pub fn grad(&self) -> Option<T> {
+        self.ptr.deref().borrow().grad().clone()
+    }
+}
 
 /// A node in a computation graph.
 #[derive(Debug)]
@@ -53,7 +73,6 @@ impl<T: RealElement + From<f64>> Node<T> {
         }
     }
 
-    // TODO: update to more like add_assign than overwrite.
     pub fn set_grad(&mut self, new_grad: T) {
         let g: &mut Option<T> = match self {
             Node::Sum(_, grad, _)
@@ -65,6 +84,24 @@ impl<T: RealElement + From<f64>> Node<T> {
         };
 
         *g = Some(new_grad);
+    }
+
+    pub fn add_assign_grad(&mut self, new_grad: T) {
+        println!("Add-assigning grad to node {}.", self);
+
+        let g: &mut Option<T> = match self {
+            Node::Sum(_, grad, _)
+            | Node::Prod(_, grad, _)
+            | Node::Exp(_, grad, _)
+            | Node::Ln(_, grad, _)
+            | Node::Pow(_, grad, _)
+            | Node::Leaf(_, grad) => grad,
+        };
+
+        match g {
+            Some(grad) => *g = Some((*grad).clone() + new_grad),
+            None => *g = Some(new_grad),
+        }
     }
 
     // Set the gradient and initiate backward propagation.
@@ -83,42 +120,42 @@ impl<T: RealElement + From<f64>> Node<T> {
         // TODO: check all these: why is there a factor self_grad in Sum & Prod but not elsewhere?
         match self {
             Node::Sum(_, _, (ref mut n1, ref mut n2)) => {
-                n1.borrow_mut().set_grad(self_grad.to_owned());
-                n2.borrow_mut().set_grad(self_grad.to_owned());
+                n1.borrow_mut().add_assign_grad(self_grad.to_owned());
+                n2.borrow_mut().add_assign_grad(self_grad.to_owned());
                 n1.borrow_mut().propagate_backward();
-                n2.borrow_mut().propagate_backward(); // TODO: spawn new thread.
+                n2.borrow_mut().propagate_backward();
             }
             Node::Prod(_, _, (ref mut n1, ref mut n2)) => {
                 n1.borrow_mut()
-                    .set_grad(n2.borrow().val().to_owned() * self_grad.clone());
+                    .add_assign_grad(n2.borrow().val().to_owned() * self_grad.clone());
                 n2.borrow_mut()
-                    .set_grad(n1.borrow().val().to_owned() * self_grad);
+                    .add_assign_grad(n1.borrow().val().to_owned() * self_grad);
                 n1.borrow_mut().propagate_backward();
-                n2.borrow_mut().propagate_backward(); // TODO: spawn new thread.
+                n2.borrow_mut().propagate_backward();
             }
             Node::Exp(_, _, ref mut n) => {
-                n.borrow_mut().set_grad(self_val);
+                n.borrow_mut().add_assign_grad(self_val);
                 n.borrow_mut().propagate_backward();
             }
             Node::Ln(_, _, ref mut n) => {
                 n.borrow_mut()
-                    .set_grad(<f64 as Into<T>>::into(1_f64) / self_val);
+                    .add_assign_grad(<f64 as Into<T>>::into(1_f64) / self_val);
                 n.borrow_mut().propagate_backward();
             }
-            // Node::Ln(_, _, ref mut n) => n.set_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
+            // Node::Ln(_, _, ref mut n) => n.add_assign_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
             Node::Pow(_, _, (ref mut b, ref mut e)) => {
                 // exponent . base^(exponent - 1)
                 let b_val = b.borrow().val().clone();
                 let e_val = e.borrow().val().clone();
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
                 b.borrow_mut()
-                    .set_grad(e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one));
+                    .add_assign_grad(e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one));
 
                 // base^exponent . ln(base)
                 e.borrow_mut()
-                    .set_grad(b_val.clone().pow(e_val.to_owned()) * b_val.ln());
+                    .add_assign_grad(b_val.clone().pow(e_val.to_owned()) * b_val.ln());
                 b.borrow_mut().propagate_backward();
-                e.borrow_mut().propagate_backward(); // TODO: spawn new thread.
+                e.borrow_mut().propagate_backward();
             }
             Node::Leaf(_, _) => {} // Do nothing.
         }
@@ -134,6 +171,14 @@ impl<T: RealElement + From<f64>> Add<Node<T>> for Node<T> {
             None,
             (Rc::new(RefCell::new(self)), Rc::new(RefCell::new(_rhs))),
         )
+    }
+}
+
+impl<T: RealElement + From<f64>> Add<NodePtr<T>> for NodePtr<T> {
+    type Output = NodePtr<T>;
+
+    fn add(self, rhs: NodePtr<T>) -> Self::Output {
+        NodePtr::new(self.ptr.deref().borrow().to_owned() + rhs.ptr.deref().borrow().to_owned())
     }
 }
 
@@ -257,6 +302,8 @@ impl<T: RealElement + From<f64>> RealElement for Node<T> {
 #[cfg(test)]
 mod tests {
 
+    use std::ops::Deref;
+
     use super::*;
 
     #[test]
@@ -276,6 +323,28 @@ mod tests {
 
         assert_eq!(node.val(), &3.1_f64);
         assert_eq!(node.grad(), &Some(0.4));
+
+        node.set_grad(0.7);
+
+        assert_eq!(node.val(), &3.1_f64);
+        assert_eq!(node.grad(), &Some(0.7));
+    }
+
+    #[test]
+    fn test_add_assign_grad() {
+        let mut node = Node::<f64>::new(3.1, None);
+        assert_eq!(node.val(), &3.1_f64);
+        assert_eq!(node.grad(), &None);
+
+        node.add_assign_grad(0.4);
+
+        assert_eq!(node.val(), &3.1_f64);
+        assert_eq!(node.grad(), &Some(0.4));
+
+        node.add_assign_grad(0.7);
+
+        assert_eq!(node.val(), &3.1_f64);
+        assert_eq!(node.grad(), &Some(1.1));
     }
 
     #[test]
@@ -286,6 +355,19 @@ mod tests {
         let result = node1 + node2;
         assert_eq!(result.val(), &25.3_f64);
         assert_eq!(result.grad(), &None);
+    }
+
+    #[test]
+    fn test_add_node_ptr() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
+
+        let np1 = NodePtr::new(node1);
+        let np2 = NodePtr::new(node2);
+
+        let result = np1 + np2;
+        assert_eq!(result.val(), 25.3_f64);
+        assert_eq!(result.grad(), None);
     }
 
     #[test]
@@ -455,7 +537,13 @@ mod tests {
             _ => panic!(),
         };
 
-        let node_x_squared = (*ref_x).borrow().to_owned().pow(node_2);
+        // Node Left + RcRefCell<Node> Right
+
+        // To consruct the x^2 node, use ref_x (the Rc<RefCell<_>> pointer to node_x).
+        // Dereference it to get the RefCell, then borrow to get the Node itself.
+        // Take ownership of the node, then call .pow() on it.
+        // Result: the new Pow node has a reference to the same node_x Node as in the 5x Prod node above.
+        let node_x_squared = ref_x.deref().borrow().to_owned().pow(node_2);
 
         let ref_2 = match &node_x_squared {
             Node::Pow(_, _, (_, n2)) => n2.clone(),
@@ -508,13 +596,11 @@ mod tests {
             9807052.117416331917906_f64
         );
 
-        // TODO: include, but requires the AddAssign fix noted above.
         // df/dx = 4x + 5 exp(5x)
-        // With x = 3 this gives:
-        // df/dx(3) = 12 + 5 * exp(15) = 16345098.862360553196509
-        // assert_eq!(
-        //     (*ref_x).borrow().grad().unwrap(),
-        //     16345098.862360553196509_f64
-        // );
+        // So, w.r.t. the x node, the grad is df/dx(3) = 12 + 5 * exp(15) = 16345098.862360553196509
+        assert_eq!(
+            (*ref_x).borrow().grad().unwrap(),
+            16345098.862360553196509_f64
+        );
     }
 }
