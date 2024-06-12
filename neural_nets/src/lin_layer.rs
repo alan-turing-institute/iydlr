@@ -7,7 +7,7 @@ use rand_chacha::ChaCha8Rng;
 use statrs::distribution::Normal;
 use std::marker::PhantomData;
 
-struct LinLayer<T: Tensor<E>, E: Element> {
+pub struct LinLayer<T: Tensor<E>, E: Element> {
     w: T,
     b: T,
     tensor_element_phantom: PhantomData<E>,
@@ -51,7 +51,7 @@ where
     T: Tensor<E>,
     E: Element + From<f64>,
 {
-    fn new(i_size: usize, o_size: usize, seed: u64) -> Self {
+    pub fn new(i_size: usize, o_size: usize, seed: u64) -> Self {
         // He weight initialisation
         // https://machinelearningmastery.com/weight-initialization-for-deep-learning-neural-networks/
         let noise_mean = 0.0;
