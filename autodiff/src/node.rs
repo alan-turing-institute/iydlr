@@ -20,6 +20,7 @@ type Ptr<N> = Rc<RefCell<N>>;
 pub enum NodeContent<T> {
     Sum(T, Option<T>, (Node<T>, Node<T>)),
     Prod(T, Option<T>, (Node<T>, Node<T>)),
+    Quot(T, Option<T>, (Node<T>, Node<T>)),
     Exp(T, Option<T>, Node<T>),
     Ln(T, Option<T>, Node<T>),
     Pow(T, Option<T>, (Node<T>, Node<T>)),
@@ -96,6 +97,14 @@ impl<T: RealElement + From<f64>> Node<T> {
                 np1.propagate_backward();
                 np2.propagate_backward();
             }
+            NodeContent::Quot(_, _, (ref mut np_num, ref mut np_denom)) => {
+                let minus_one = <f64 as Into<T>>::into(-1_f64);
+                let two = <f64 as Into<T>>::into(2_f64);
+                np_num.add_assign_grad(self_grad.clone() / np_denom.val().to_owned());
+                np_denom.add_assign_grad(minus_one * self_grad * np_num.val().to_owned() / np_denom.val().to_owned().pow(two));
+                np_num.propagate_backward();
+                np_denom.propagate_backward();
+            }
             NodeContent::Exp(_, _, ref mut np) => {
                 np.add_assign_grad(self_grad * self_val);
                 np.propagate_backward();
@@ -143,6 +152,7 @@ impl<T: RealElement + From<f64>> NodeContent<T> {
         match self {
             NodeContent::Sum(val, _, _)
             | NodeContent::Prod(val, _, _)
+            | NodeContent::Quot(val, _, _)
             | NodeContent::Exp(val, _, _)
             | NodeContent::Ln(val, _, _)
             | NodeContent::Pow(val, _, _)
@@ -154,6 +164,7 @@ impl<T: RealElement + From<f64>> NodeContent<T> {
         match self {
             NodeContent::Sum(_, grad, _)
             | NodeContent::Prod(_, grad, _)
+            | NodeContent::Quot(_, grad, _)
             | NodeContent::Exp(_, grad, _)
             | NodeContent::Ln(_, grad, _)
             | NodeContent::Pow(_, grad, _)
@@ -165,6 +176,7 @@ impl<T: RealElement + From<f64>> NodeContent<T> {
         let g: &mut Option<T> = match self {
             NodeContent::Sum(_, grad, _)
             | NodeContent::Prod(_, grad, _)
+            | NodeContent::Quot(_, grad, _)
             | NodeContent::Exp(_, grad, _)
             | NodeContent::Ln(_, grad, _)
             | NodeContent::Pow(_, grad, _)
@@ -178,6 +190,7 @@ impl<T: RealElement + From<f64>> NodeContent<T> {
         let g: &mut Option<T> = match self {
             NodeContent::Sum(_, grad, _)
             | NodeContent::Prod(_, grad, _)
+            | NodeContent::Quot(_, grad, _)
             | NodeContent::Exp(_, grad, _)
             | NodeContent::Ln(_, grad, _)
             | NodeContent::Pow(_, grad, _)
@@ -236,7 +249,7 @@ impl<T: RealElement + From<f64>> Div<NodeContent<T>> for NodeContent<T> {
 
     fn div(self, rhs: NodeContent<T>) -> NodeContent<T> {
         // Same division by zero rules as standard division operator.
-        NodeContent::Prod(
+        NodeContent::Quot(
             self.val().clone() / rhs.val().clone(),
             None,
             (self.into(), rhs.into()),
@@ -248,7 +261,7 @@ impl<T: RealElement + From<f64>> Div<Node<T>> for Node<T> {
     type Output = Node<T>;
 
     fn div(self, rhs: Node<T>) -> Self::Output {
-        NodeContent::Prod(self.val() / rhs.val(), None, (self, rhs)).into()
+        NodeContent::Quot(self.val() / rhs.val(), None, (self, rhs)).into()
     }
 }
 
@@ -322,6 +335,7 @@ impl<T: RealElement> Clone for NodeContent<T> {
         match self {
             Self::Sum(arg0, arg1, arg2) => Self::Sum(arg0.clone(), arg1.clone(), arg2.clone()),
             Self::Prod(arg0, arg1, arg2) => Self::Prod(arg0.clone(), arg1.clone(), arg2.clone()),
+            Self::Quot(arg0, arg1, arg2) => Self::Quot(arg0.clone(), arg1.clone(), arg2.clone()),
             Self::Exp(arg0, arg1, arg2) => Self::Exp(arg0.clone(), arg1.clone(), arg2.clone()),
             Self::Ln(arg0, arg1, arg2) => Self::Ln(arg0.clone(), arg1.clone(), arg2.clone()),
             Self::Pow(arg0, arg1, arg2) => Self::Pow(arg0.clone(), arg1.clone(), arg2.clone()),
@@ -343,6 +357,7 @@ impl<T: RealElement> PartialEq for NodeContent<T> {
         match (self, other) {
             (Self::Sum(l0, l1, l2), Self::Sum(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
             (Self::Prod(l0, l1, l2), Self::Prod(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
+            (Self::Quot(l0, l1, l2), Self::Quot(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
             (Self::Exp(l0, l1, l2), Self::Exp(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
             (Self::Ln(l0, l1, l2), Self::Ln(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
             (Self::Pow(l0, l1, l2), Self::Pow(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
@@ -747,7 +762,7 @@ mod tests {
         let node_314 = Node::new(3.14, None);
         let node_1 = node_x.clone() + node_314.clone();
         let node_1 = node_1.clone().ln();
-        let node_1 = node_1.clone() * node_x.clone().pow(Node::from(-1.0));
+        let node_1 = node_1.clone() / node_x.clone();
         let node_1 = node_1.clone() * node_x.clone();
         let node_1 = node_1.clone().exp();
         let node_1 = node_1.clone() + (Node::from(-1.0) * node_314.clone());
