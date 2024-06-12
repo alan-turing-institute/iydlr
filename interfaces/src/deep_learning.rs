@@ -1,4 +1,4 @@
-use crate::tensors::{Element, Tensor};
+use crate::tensors::{AsAnyhowError, Element, Tensor};
 use std::fmt::Debug;
 
 /// Deep Learning Module, generic over a Tensor object T and it's elements E.
@@ -7,9 +7,8 @@ where
     T: Tensor<E>,
     E: Element,
 {
-    type DLModuleError: Debug
-        + From<<T as Tensor<E>>::TensorError>
-        + Into<<T as Tensor<E>>::TensorError>;
+    type DLModuleError: Debug + AsAnyhowError;
+    // + Into<<T as Tensor<E>>::TensorError>;
 
     /// Forward pass through the module. Implementers must support a 1-dimensional `x` and may also
     /// support forwarding an n-dimensional `x` (eg. a "batch").

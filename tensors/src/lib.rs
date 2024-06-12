@@ -1,5 +1,5 @@
 use anyhow::Error;
-use interfaces::tensors::{Element, RealElement, RealTensor, Tensor};
+use interfaces::tensors::{AsStdError, Element, RealElement, RealTensor, Tensor};
 use interfaces::utils::{Exp, Ln, Pow};
 use std::{
     fmt::Debug,
@@ -69,22 +69,18 @@ impl<E: Element> TensorImpl<E> {
         let self_num_dims = self.num_dims();
         let other_num_dims = other.num_dims();
         if self_num_dims < 2 {
-            return Err(Error::msg(
-                "The first tensor int matmul must have at least 2 dimensions",
-            ));
+            return Err(
+                Error::msg("The first tensor int matmul must have at least 2 dimensions").into(),
+            );
         }
         if other_num_dims != 2 {
-            return Err(Error::msg(
-                "The second tensor int matmul must have 2 dimensions",
-            ));
+            return Err(Error::msg("The second tensor int matmul must have 2 dimensions").into());
         }
         let dim1 = self.shape[self_num_dims - 2];
         let dim_inner = self.shape[self_num_dims - 1];
         let dim2 = other.shape[other_num_dims - 2];
         if dim_inner != other.shape[other_num_dims - 1] {
-            return Err(Error::msg(
-                "The contracted dimensions of the tensors must match.",
-            ));
+            return Err(Error::msg("The contracted dimensions of the tensors must match.").into());
         }
         let lead_dim = self
             .shape
@@ -387,13 +383,14 @@ impl<E> Tensor<E> for TensorImpl<E>
 where
     E: Element,
 {
-    type TensorError = Error;
+    type TensorError = AsStdError;
 
     fn from_vec(shape: &Vec<usize>, data: &Vec<E>) -> Result<Self, Self::TensorError> {
         if num_elements_from_shape(shape) != data.len() {
             return Err(Error::msg(
                 "The length of the `data` param does not match the values of the `shape` param",
-            ));
+            )
+            .into());
         } else {
             Ok(TensorImpl {
                 shape: shape.clone(),
@@ -476,15 +473,14 @@ where
         dim: usize,
     ) -> Result<Self, <Self as Tensor<E>>::TensorError> {
         if self.num_dims() != other.num_dims() {
-            return Err(Error::msg(
-                "Tensors must have the same number of dimensions",
-            ));
+            return Err(Error::msg("Tensors must have the same number of dimensions").into());
         }
         for i in 0..self.shape.len() {
             if i != dim && self.shape[i] != other.shape[i] {
                 return Err(Error::msg(
                     "Tensors must have the same shape except for the concatenation dimension",
-                ));
+                )
+                .into());
             }
         }
 

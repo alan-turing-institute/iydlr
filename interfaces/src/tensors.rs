@@ -1,11 +1,20 @@
 use num::traits::Zero;
 use std::{
     cmp::PartialEq,
+    error::Error,
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul},
 };
+use thiserror::Error;
 
 use crate::utils::{Exp, Ln, Pow};
+
+pub trait AsAnyhowError: From<AsStdError> + Send + Sync {}
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub struct AsStdError(#[from] anyhow::Error);
+impl AsAnyhowError for AsStdError {}
 
 /// Tensor interface, generic over the the type of the elements contained within the tensor.
 /// The element type must be an implementer of `Element`.
@@ -24,7 +33,7 @@ pub trait Tensor<E>:
 where
     E: Element,
 {
-    type TensorError: Debug;
+    type TensorError: Debug + AsAnyhowError + From<AsStdError> + From<anyhow::Error>;
 
     fn shape(&self) -> Vec<usize>;
 
