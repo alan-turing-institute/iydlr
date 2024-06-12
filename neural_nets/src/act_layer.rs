@@ -7,7 +7,7 @@ use std::iter::Iterator;
 use std::marker::PhantomData;
 
 struct ActLayer<T: Tensor<E>, E: Element> {
-    placeholder: T,
+    tensor_phantom: PhantomData<T>,
     tensor_element_phantom: PhantomData<E>,
 }
 
@@ -45,7 +45,7 @@ where
 impl<T, E> ActivationLayer<T, E> for ActLayer<T, E>
 where
     T: Tensor<E>,
-    E: Element,
+    E: Element + Into<f64>,
 {
 }
 
@@ -55,6 +55,9 @@ where
     E: Element,
 {
     fn new() -> Self {
-        todo!("Implement the new method for the activation layer")
+        ActLayer {
+            tensor_phantom: PhantomData,
+            tensor_element_phantom: PhantomData,
+        }
     }
 }
