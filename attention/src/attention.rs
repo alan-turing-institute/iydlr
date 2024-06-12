@@ -2,7 +2,7 @@ use interfaces::deep_learning::{DLModule, LinearLayer};
 use interfaces::tensors::{RealElement, RealTensor, Tensor};
 use std::marker::PhantomData;
 
-pub trait MaskedSelfAttention<T, E>: DLModule<T, E>
+pub trait SelfAttention<T, E>: DLModule<T, E>
 where
     T: Tensor<E>,
     E: RealElement,
@@ -119,7 +119,7 @@ where
     }
 }
 
-impl<T, E, L> MaskedSelfAttention<T, E> for MultiHeadAttention<T, E, L>
+impl<T, E, L> SelfAttention<T, E> for MultiHeadAttention<T, E, L>
 where
     L: LinearLayer<T, E>,
     T: RealTensor<E>,

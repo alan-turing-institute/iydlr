@@ -6,7 +6,7 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use statrs::distribution::Normal;
 use std::marker::PhantomData;
-pub mod embedding_table;
+// pub mod embedding_table;
 
 struct LinLayer<T: Tensor<E>, E: Element> {
     w: T,
