@@ -99,7 +99,10 @@ where
 
         // Concatanate over heads
         // TODO: check concat is channel-wise
-        Ok(outputs.into_iter().reduce(|acc, x| acc.concat(&x, acc.shape().len()-1).unwrap()).unwrap())
+        Ok(outputs
+            .into_iter()
+            .reduce(|acc, x| acc.concat(&x, acc.shape().len() - 1).unwrap())
+            .unwrap())
     }
 
     fn params(&self) -> Vec<E> {
