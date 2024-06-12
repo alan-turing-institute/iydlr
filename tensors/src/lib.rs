@@ -1,10 +1,9 @@
 use anyhow::Error;
 use interfaces::tensors::{Element, RealElement, RealTensor, Tensor};
 use interfaces::utils::{Exp, Ln, Pow};
-use std::ops::Div;
 use std::{
     fmt::Debug,
-    ops::{Add, Mul},
+    ops::{Add, Div, Mul, Sub},
     vec::Vec,
 };
 
@@ -202,6 +201,85 @@ impl<E: Element> TensorImpl<E> {
         };
         return result;
     }
+
+    fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
+        if self.shape() == other.shape() {
+            return self.elementwise_binary_op_same_shape(other, op);
+        } else {
+            return self.elementwise_binary_op_broadcast(other, op);
+        }
+    }
+
+    fn elementwise_binary_op_same_shape(self, other: Self, op: fn(E, E) -> E) -> Self {
+        let data: Vec<E> = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
+            .map(|(a, b)| op(a.clone(), b.clone()))
+            .collect();
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+
+    fn elementwise_binary_op_broadcast(self, other: Self, op: fn(E, E) -> E) -> Self {
+        if self.num_dims() != other.num_dims() {
+            panic!("Shapes are not compatible for element-wise operations.");
+        }
+        let num_dims = self.num_dims();
+        for i in 0..self.shape.len() {
+            if self.shape[i] != other.shape[i] && self.shape[i] != 1 && other.shape[i] != 1 {
+                panic!("Shapes are not compatible for element-wise operations.");
+            }
+        }
+
+        let new_shape: Vec<usize> = self
+            .shape
+            .iter()
+            .zip(other.shape.iter())
+            .map(|(a, b)| std::cmp::max(a, b).clone())
+            .collect();
+        let result_num_elements = num_elements_from_shape(&new_shape);
+        let mut new_data: Vec<E> = Vec::with_capacity(result_num_elements);
+
+        let mut self_idx: Vec<usize> = vec![0; num_dims];
+        let mut other_idx: Vec<usize> = vec![0; num_dims];
+        let mut which_index_to_increment: usize;
+        while new_data.len() != result_num_elements {
+            let self_element = self.at(self_idx.clone()).unwrap();
+            let other_element = other.at(other_idx.clone()).unwrap();
+            new_data.push(op(self_element.clone(), other_element.clone()));
+
+            // Increment the indices
+            which_index_to_increment = num_dims - 1;
+            while self_idx[which_index_to_increment] == self.shape[which_index_to_increment] - 1
+                && other_idx[which_index_to_increment] == other.shape[which_index_to_increment] - 1
+            {
+                if which_index_to_increment == 0 {
+                    break;
+                } else {
+                    which_index_to_increment -= 1;
+                }
+            }
+            if self.shape[which_index_to_increment] != 1 {
+                self_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..num_dims {
+                self_idx[i] = 0;
+            }
+            if other.shape[which_index_to_increment] != 1 {
+                other_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..num_dims {
+                other_idx[i] = 0;
+            }
+        }
+        let result = Self {
+            shape: new_shape,
+            data: new_data,
+        };
+        return result;
+    }
 }
 
 impl<E: Element> IntoIterator for TensorImpl<E> {
@@ -224,11 +302,34 @@ impl<E: Element> Add for TensorImpl<E> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        if self.shape() == other.shape() {
-            return self.add_same_shape(other);
-        } else {
-            return self.add_broadcast(other);
-        }
+        self.elementwise_binary_op(other, |a, b| a + b)
+    }
+}
+
+/// Dividing to two tensors elementwise.
+impl<E: Element> Div for TensorImpl<E> {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        self.elementwise_binary_op(other, |a, b| a / b)
+    }
+}
+
+/// Multiplying to two tensors elementwise.
+impl<E: Element> Mul for TensorImpl<E> {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        self.elementwise_binary_op(other, |a, b| a * b)
+    }
+}
+
+/// Subtracting to two tensors elementwise.
+impl<E: Element + Sub<Output = E>> Sub for TensorImpl<E> {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        self.elementwise_binary_op(other, |a, b| a - b)
     }
 }
 
@@ -242,27 +343,6 @@ impl<E: Element> Add<E> for TensorImpl<E> {
             .iter()
             // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
             .map(|a| a.clone() + scalar.clone())
-            .collect();
-        // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(&self.shape(), &data).unwrap()
-    }
-}
-
-/// Multiplying to two tensors together elementwise.
-impl<E: Element> Mul for TensorImpl<E> {
-    type Output = Self;
-
-    fn mul(self, other: Self) -> Self {
-        if self.shape() != other.shape() {
-            panic!("Shapes are not compatible for element-wise operations.");
-        }
-
-        let data: Vec<E> = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
-            .map(|(a, b)| a.clone() * b.clone())
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
         TensorImpl::from_vec(&self.shape(), &data).unwrap()
@@ -514,8 +594,12 @@ impl<E: RealElement> Exp for TensorImpl<E> {
 }
 
 impl<E: RealElement> Pow<E> for TensorImpl<E> {
-    fn pow(self, exp: E) -> Self{
-        let new_data = self.data.iter().map(|x| x.clone().pow(exp.clone())).collect();
+    fn pow(self, exp: E) -> Self {
+        let new_data = self
+            .data
+            .iter()
+            .map(|x| x.clone().pow(exp.clone()))
+            .collect();
         TensorImpl {
             shape: self.shape,
             data: new_data,
@@ -524,7 +608,7 @@ impl<E: RealElement> Pow<E> for TensorImpl<E> {
 }
 
 impl<E: RealElement> Ln for TensorImpl<E> {
-    fn ln(self) -> Self{
+    fn ln(self) -> Self {
         let new_data = self.data.iter().map(|x| x.clone().ln()).collect();
         TensorImpl {
             shape: self.shape,
@@ -535,7 +619,6 @@ impl<E: RealElement> Ln for TensorImpl<E> {
 
 impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
-
         let data_exp = self.clone().exp();
         let data_sum = data_exp.dim_sum(vec![dim]);
 
@@ -752,8 +835,6 @@ mod tests {
         let _tensor3 = tensor.clone() / 0;
     }
 
-
-
     #[test]
     fn test_single_dim_sum() {
         let shape = vec![2, 2, 2];
@@ -925,7 +1006,7 @@ mod tests {
         let tensor_ln = tensor.ln();
         assert_eq!(tensor_ln.data, expected_data);
     }
-    
+
     #[test]
     fn test_concat() {
         let mut rng = rand::thread_rng();
@@ -1104,10 +1185,7 @@ mod tests {
         let data = vec![1.0, 2.0];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
         let result = tensor.softmax(0);
-        let expected_data = vec![
-            0.09003057317038046,
-            0.24472847105479764,
-        ];
+        let expected_data = vec![0.09003057317038046, 0.24472847105479764];
         assert_eq!(result.data, expected_data);
     }
 
