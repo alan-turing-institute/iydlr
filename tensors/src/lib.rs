@@ -533,10 +533,6 @@ impl<E> TensorImpl<E>
 where
     E: Element,
 {
-    pub fn get_shape(&self) -> &Vec<usize> {
-        self.shape.as_ref()
-    }
-
     pub fn get_data(&self) -> &Vec<E> {
         self.data.as_ref()
     }
