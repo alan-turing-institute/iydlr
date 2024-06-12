@@ -571,7 +571,8 @@ where
                     let idx = lead_idx * self.shape[dim] * trailing_dims
                         + summing_idx * trailing_dims
                         + trail_idx;
-                    sum += self.data[idx].clone();
+                    // sum += self.data[idx].clone();
+                    sum = sum + self.data[idx].clone();
                 }
                 dim_sum.push(sum);
             }

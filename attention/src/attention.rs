@@ -146,22 +146,32 @@ where
                     .forward(&single_batch_tensor)
                     .unwrap();
                 let last_dim_of_keys = *key.shape().last().unwrap(); // d_k
-
+                println!("{:?}", value.shape());
                 // make sure only last two dimensions are transposed
                 let att: T = query.matmul(&key.transpose()).unwrap() *
                     // TODO: make this safer
                     E::from((last_dim_of_keys as f64).powf(-0.5));
 
                 // softmax along the sequence length, TODO: check correct dim for softmax
+                // TODO: mask currently not working with shape
                 let att: T = if let Some(mask) = &self.mask {
-                    let masked_x: T = mask.clone() * x.clone(); // element-wise multiplication: (B x T x T)  x (B x T x C)
+                    println!("{:?}", mask.shape());
+                    println!("{:?}", single_batch_tensor.shape());
+                    // element-wise multiplication: (B x T x T)  x (B x T x C)
+                    let masked_x: T = mask.clone() * single_batch_tensor.clone();
+                    // TODO: why does this not mul?
+                    println!("{:?}", masked_x.shape());
+                    println!("{:?}", att.shape());
                     att * masked_x
                 } else {
                     att
                 };
+                println!("{:?}", self.mask);
                 // TODO: check softmax dim
                 // softmax now dim 0 (seq_len)
-                let att = att.softmax(0);
+                // TODO: Softmax currently not implemented
+                // let att = att.softmax(0);
+
                 // matmul attention masked with V
                 let att_v: T = att.matmul(&value).unwrap();
                 batch_outs.push(att_v);

@@ -23,13 +23,13 @@ where
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
         let input_shape = x.shape();
         // The shape of the input tensor must be (B, T, C)
-        if input_shape.len() != 3 {
-            return Err(
-                anyhow::Error::msg("The shape of the input tensor must be (B, T, C)").into(),
-            );
-        } else {
-            return Ok(x.clone().matmul(&self.w.clone())? + self.b.clone());
-        }
+        // if input_shape.len() != 3 {
+        //     return Err(
+        //         anyhow::Error::msg("The shape of the input tensor must be (B, T, C)").into(),
+        //     );
+        // } else {
+        return Ok(x.clone().matmul(&self.w.clone())? + self.b.clone());
+        // }
     }
 
     fn params(&self) -> Vec<E> {
@@ -76,7 +76,8 @@ where
 
         let weights = T::from_vec(&vec![i_size, o_size], &w_data)
             .expect("Ensured data can be arranged into a matrix of the given size.");
-        let bias = T::from_vec(&vec![1_usize, 1_usize, o_size], &b_data)
+        // let bias = T::from_vec(&vec![1_usize, 1_usize, o_size], &b_data)
+        let bias = T::from_vec(&vec![1_usize, o_size], &b_data)
             .expect("Ensured data can be arranged into a matrix of the given size.");
 
         LinLayer {
