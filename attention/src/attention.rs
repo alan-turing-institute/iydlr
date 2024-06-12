@@ -122,9 +122,11 @@ where
         for attention_head_idx in 0..self.num_heads {
             // TODO: fix unwraps once error conversion is handled
             let query = self.query_weights[attention_head_idx].forward(x).unwrap(); // just a matmul, Unwrap used since we currently do not have conversion implemented
-            let key: T = self.key_weights[attention_head_idx].forward(x).unwrap();
+            println!("{:?}", x.shape());
+            let key: T = self.key_weights[attention_head_idx].forward(x).unwrap(); // B x T x d_k (C / num_heads)
+            println!("{:?}", key.shape());
             let value: T = self.value_weights[attention_head_idx].forward(x).unwrap();
-            let last_dim_of_keys = *key.shape().last().unwrap();
+            let last_dim_of_keys = *key.shape().last().unwrap(); // d_k
 
             // make sure only last two dimensions are transposed
             let att: T = query.matmul(&key.transpose()).unwrap() *
@@ -173,7 +175,7 @@ mod tests {
         Config {
             batch_size: 2,
             vocab_size: 10,
-            seq_len: 5,
+            seq_len: 7,
             embed_dim: 20,
             num_head: 4,
         }
@@ -188,8 +190,10 @@ mod tests {
         // check that mask has the right shape
         // print the shape of the mask
         //println!("{:?}", attention.mask.as_ref().unwrap().shape());
-        assert_eq!(attention.mask.unwrap().shape(), vec![5, 5]);
-        //assert_eq!(attention.query_weights.len(), 3);
+        assert_eq!(attention.mask.unwrap().shape(), vec![7, 7]);
+        assert_eq!(attention.query_weights.len(), 4);
+        // println!("{:?}", attention.query_weights[0].w);
+        println!("{:?}", attention.key_weights[0].w);
     }
 
     #[test]
@@ -203,6 +207,6 @@ mod tests {
         )
         .unwrap();
         let out = attention.forward(&x).unwrap();
-        println!("{:?}", out);
+        println!("{:?}", out.shape());
     }
 }

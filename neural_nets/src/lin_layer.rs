@@ -8,8 +8,8 @@ use statrs::distribution::Normal;
 use std::marker::PhantomData;
 
 pub struct LinLayer<T: Tensor<E>, E: Element> {
-    w: T,
-    b: T,
+    pub w: T,
+    pub b: T,
     tensor_element_phantom: PhantomData<E>,
 }
 
@@ -104,6 +104,7 @@ mod tests {
         let x = TensorImpl::from_vec(&vec![2, 2, 2], &vec![6.0; 8]).unwrap();
         println!("{:?}", x.shape());
         let out = layer.forward(&x).unwrap();
+        println!("{:?}", out);
         assert_eq!(out.shape(), vec![2, 2, 3]);
     }
 
