@@ -1,5 +1,6 @@
 use anyhow::Error;
-use interfaces::tensors::{Element, Tensor};
+use interfaces::tensors::{Element, RealElement, RealTensor, Tensor};
+use interfaces::utils::{Exp, Ln, Pow};
 use std::{
     fmt::Debug,
     ops::{Add, Mul},
@@ -306,10 +307,62 @@ where
         return self.matmul_transpose(&other.transpose());
     }
 
+    /// Interleaves last dimension of the input tensors and concatenates them along the last dimension.
+    fn concat(
+        self: &Self,
+        other: &Self,
+        dim: usize,
+    ) -> Result<Self, <Self as Tensor<E>>::TensorError> {
+        if self.num_dims() != other.num_dims() {
+            return Err(Error::msg(
+                "Tensors must have the same number of dimensions",
+            ));
+        }
+        if dim != self.num_dims() - 1 {
+            return Err(Error::msg(
+                "Concatenation is only supported along the last dimension",
+            ));
+        }
+        for i in 0..self.shape.len() {
+            if i != dim && self.shape[i] != other.shape[i] {
+                return Err(Error::msg(
+                    "Tensors must have the same shape except for the concatenation dimension",
+                ));
+            }
+        }
+
+        let self_last_dim = *self.shape.last().unwrap();
+        let other_last_dim = *other.shape.last().unwrap();
+
+        // Interleave the two flattened tensors in chunks equal to size of last dim of respective tensors
+        let new_data: Vec<E> = self
+            .data
+            .chunks(self_last_dim)
+            .zip(other.data.chunks(other_last_dim)) // yields items like (&[1.0, 2.0, 3.0], &[7.0, 8.0, 9.0])
+            .flat_map(|(a, b)| a.into_iter().chain(b)) // chains to produce iterators like [1.0, 2.0, 3.0, 7.0, 8.0, 9.0]
+            // TODO: consider adding a bound on copy
+            // .copied()
+            .cloned() // &f64 -> f64, optional
+            .collect();
+
+        // Convert output_vec into a tensor with required output shape
+        let mut new_shape = self.shape.clone();
+        new_shape[dim] = self.shape[dim] + other.shape[dim];
+        return Ok(Self {
+            shape: new_shape,
+            data: new_data,
+        });
+    }
+
     /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self {
-        unimplemented!()
+        // naive implementation, just looping over the dimensions
+        let mut result = self.clone();
+        for dim in dims {
+            result = result.single_dim_sum(dim);
+        }
+        return result;
     }
 }
 
@@ -333,31 +386,74 @@ where
             .product::<usize>();
 
         println!("leading_dims: {}", leading_dims);
+        println!("self.shape[dim]: {}", self.shape[dim]);
         println!("trailing_dims: {}", trailing_dims);
 
-        let mut output_shape  = self.shape.clone();
+        let mut output_shape = self.shape.clone();
         output_shape[dim] = 1;
         let output_size = output_shape.iter().product::<usize>();
 
         let mut dim_sum: Vec<E> = Vec::new();
-        
+
         // Outer loop needs to iterate over the size of the new shape
-        for i in 0..output_size {
-            let mut sum: E = E::zero();
-            for (j, value) in self.data.iter().enumerate() {
-                // print value of i, j and value
-                if j % self.shape[dim] == i {
-                    sum += value.clone();
+        for lead_idx in 0..leading_dims {
+            for trail_idx in 0..trailing_dims {
+                let mut sum: E = E::zero();
+                for summing_idx in 0..self.shape[dim] {
+                    let idx = lead_idx * self.shape[dim] * trailing_dims
+                        + summing_idx * trailing_dims
+                        + trail_idx;
+                    // let idx = summing_idx + lead_idx + (trail_idx * leading_dims);
+
+                    // sum += original[lead_idx,summing_idx,trail_idx]
+                    sum += self.data[idx].clone();
                 }
-                println!("i: {}, j: {}, value: {}, sum: {}", i, j, value, sum);
+                // for (j, value) in self.data.iter().enumerate() {
+                //     // print value of i, j and value
+                //     let a = j % leading_dims;
+                //     let b = j % trailing_dims;
+
+                //     if j % self.shape[dim] == trail_idx {
+                //         sum += value.clone();
+                //     }
+                //     println!("i: {}, j: {}, a: {}, b: {}, value: {}, sum: {}", trail_idx, j, a, b, value, sum);
+                // }
+                dim_sum.push(sum);
             }
-            dim_sum.push(sum);
         }
 
         TensorImpl {
             shape: output_shape,
             data: dim_sum,
         }
+    }
+}
+
+impl<E: RealElement> Exp for TensorImpl<E> {
+    fn exp(self) -> Self {
+        todo!()
+    }
+}
+
+impl<E: RealElement> Pow<E> for TensorImpl<E> {
+    fn pow(self, exp: E) -> Self {
+        todo!()
+    }
+}
+
+impl<E: RealElement> Ln for TensorImpl<E> {
+    fn ln(self) -> Self {
+        todo!()
+    }
+}
+
+impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
+    fn softmax(&self, dim: usize) -> Self {
+        todo!()
+    }
+
+    fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
+        todo!()
     }
 }
 
@@ -551,21 +647,48 @@ mod tests {
 
     #[test]
     fn test_single_dim_sum() {
-        let shape = vec![2, 2];
-        let data = vec![1, 2, 3, 4];
+        let shape = vec![2, 2, 2];
+        let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
-        let expected_col_sum = vec![2, 4];
-        let expected_col_shape = vec![1, 2]; 
-        let actual_col_sum = tensor.single_dim_sum(0);
+        let expected_depth_sum = vec![6, 8, 10, 12];
+        let expected_depth_shape = vec![1, 2, 2];
+        let actual_depth_sum = tensor.single_dim_sum(0);
+        assert_eq!(actual_depth_sum.data, expected_depth_sum);
+        assert_eq!(actual_depth_sum.shape, expected_depth_shape);
+
+        let expected_col_sum = vec![4, 6, 12, 14];
+        let expected_col_shape = vec![2, 1, 2];
+        let actual_col_sum = tensor.single_dim_sum(1);
         assert_eq!(actual_col_sum.data, expected_col_sum);
         assert_eq!(actual_col_sum.shape, expected_col_shape);
 
-        let expected_row_sum = vec![1, 5];
-        let expected_row_shape = vec![2, 1]; 
-        let actual_row_sum = tensor.single_dim_sum(1);
+        let expected_row_sum = vec![3, 7, 11, 15];
+        let expected_row_shape = vec![2, 2, 1];
+        let actual_row_sum = tensor.single_dim_sum(2);
         assert_eq!(actual_row_sum.data, expected_row_sum);
         assert_eq!(actual_row_sum.shape, expected_row_shape);
+    }
+
+    #[test]
+    fn test_multiple_dim_sum() {
+        let original_shape = vec![2, 3, 4, 5];
+        let original_data_len = original_shape.iter().product::<usize>();
+        let opiginal_data = (1..original_data_len + 1).collect::<Vec<usize>>();
+
+        let tensor = TensorImpl::from_vec(&original_shape, &opiginal_data).unwrap();
+
+        // Sum over dimensions 1 and 3
+        // The result should have shape [2, 1, 4, 1]
+        // The result should not be dependent of the order of the dimensions
+        let expected_shape = vec![2, 1, 4, 1];
+
+        let actual_sum_fwd = tensor.dim_sum(vec![1, 3]);
+        let actual_sum_bwd = tensor.dim_sum(vec![3, 1]);
+
+        assert_eq!(actual_sum_fwd.shape, expected_shape);
+        assert_eq!(actual_sum_bwd.shape, expected_shape);
+        assert_eq!(actual_sum_fwd.data, actual_sum_bwd.data);
     }
 
     #[test]
@@ -662,5 +785,56 @@ mod tests {
         let data = vec![1, 2, 3, 4, 5, 6];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
         assert_eq!(Vec::<i32>::from(tensor), data);
+    }
+
+    #[test]
+    fn test_concat_shape() {
+        let mut rng = rand::thread_rng();
+
+        let shape1 = vec![5, 4, 3, 2];
+        let num_elements1 = num_elements_from_shape(&shape1);
+        let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+        let shape2 = vec![5, 4, 3, 3];
+        let num_elements2 = num_elements_from_shape(&shape2);
+        let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+        let result = tensor1.concat(&tensor2, 3).unwrap();
+        let shape_expected = vec![5, 4, 3, 5];
+        assert_eq!(result.shape, shape_expected);
+    }
+
+    #[test]
+    /// Test that concat(A * B, A * C, 2) == A * concat(B, C, 2).
+    fn test_concat_matmul() {
+        let mut rng = rand::thread_rng();
+
+        let shape1 = vec![3, 2];
+        let num_elements1 = num_elements_from_shape(&shape1);
+        let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+        let shape2 = vec![3, 4];
+        let num_elements2 = num_elements_from_shape(&shape2);
+        let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+        let shape3 = vec![3, 3];
+        let num_elements3 = num_elements_from_shape(&shape3);
+        let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
+        let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
+
+        let result1 = tensor3
+            .matmul(&tensor1.concat(&tensor2, 1).unwrap())
+            .unwrap();
+        let result2 = tensor3
+            .matmul(&tensor1)
+            .unwrap()
+            .concat(&tensor3.matmul(&tensor2).unwrap(), 1)
+            .unwrap();
+        assert_eq!(result1.shape, result2.shape);
+        assert_eq!(result1.data, result2.data);
     }
 }

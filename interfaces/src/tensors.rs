@@ -44,6 +44,8 @@ where
     /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self;
+
+    fn concat(&self, other: &Self, dim: usize) -> Result<Self, Self::TensorError>;
 }
 
 /// Collection of traits required by the elements of a Tensor.
@@ -74,7 +76,7 @@ where
     // Note: May provide different behaviour to `Tensor::fill_with_clone` (eg. by creating "new"
     // primitives rather than cloning existing primitives).
     // TODO(mhauru): Come back to this later.
-    // fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
+    fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self;
 }
 
 // impl<T> From<T> for Vec<f64>
