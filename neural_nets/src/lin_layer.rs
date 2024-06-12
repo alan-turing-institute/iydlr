@@ -1,3 +1,4 @@
+use core::panic;
 use interfaces::deep_learning::{DLModule, LinearLayer};
 use interfaces::tensors::{Element, Tensor};
 use rand::distributions::Distribution;
@@ -18,26 +19,17 @@ where
     E: Element,
 {
     type DLModuleError = <T as Tensor<E>>::TensorError;
+
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
         let input_shape = x.shape();
-        // The addition assumes broadcasting if x is a batch (b,i)
-        if input_shape.len() != 2 {
-            unimplemented!("gracefully handle inputs with other dims != 2")
-        }
-
-        // batch size = 1
-        if input_shape[0] == 1 {
-            return Ok(self.w.matmul(&x.clone().transpose())? + self.b.clone());
+        // The shape of the input tensor must be (B, T, C)
+        if input_shape.len() != 3 {
+            panic!("The shape of the input tensor must be (B, T, C)");
         } else {
-            todo!()
-            // let mut b_concat = self.b.clone();
-
-            // for _ in 0..input_shape[0] {
-            //     b_concat = concat(b_concat, self.b.clone())
-            // }
-            // Ok(self.w.matmul(&x.clone().transpose())? + b_concat)
+            return Ok(x.clone().matmul(&self.w.clone())? + self.b.clone());
         }
     }
+
     fn params(&self) -> Vec<E> {
         let mut res: Vec<E> = self.w.clone().into();
         res.extend(self.b.clone().into());
@@ -80,9 +72,9 @@ where
                 }
             });
 
-        let weights = T::from_vec(&vec![o_size, i_size], &w_data)
+        let weights = T::from_vec(&vec![i_size, o_size], &w_data)
             .expect("Ensured data can be arranged into a matrix of the given size.");
-        let bias = T::from_vec(&vec![o_size, 1_usize], &b_data)
+        let bias = T::from_vec(&vec![1_usize, 1_usize, o_size], &b_data)
             .expect("Ensured data can be arranged into a matrix of the given size.");
 
         LinLayer {
@@ -103,30 +95,22 @@ mod tests {
         let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 1, 0);
     }
 
-    // #[test]
-    // fn one_dim_forward() {
-    //     let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
-    //     let x = TensorImpl::from_vec(&vec![2], &vec![6.0; 2]).unwrap();
-    //     println!("{:?}", x.shape());
-    //     let out = layer.forward(&x).unwrap();
-    //     assert_eq!(out.shape(), vec![1, 3])
-    // }
-
-    // #[test]
-    // fn two_dim_forward() {
-    //     let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
-    //     let x = TensorImpl::from_vec(&vec![2, 2], &vec![6.0; 4]).unwrap();
-    //     println!("{:?}", x.shape());
-    //     let out = layer.forward(&x).unwrap();
-    //     assert_eq!(out.shape(), vec![2, 3])
-    // }
-
     #[test]
     fn three_dim_forward() {
+        // Test that the forward method works when the input tensor is 3D
         let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
         let x = TensorImpl::from_vec(&vec![2, 2, 2], &vec![6.0; 8]).unwrap();
         println!("{:?}", x.shape());
         let out = layer.forward(&x).unwrap();
         assert_eq!(out.shape(), vec![2, 2, 3]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn forward_panic() {
+        // Test that the forward method panics when the input tensor is not 3D
+        let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
+        let x = TensorImpl::from_vec(&vec![2, 2], &vec![6.0; 4]).unwrap();
+        layer.forward(&x).unwrap();
     }
 }
