@@ -310,7 +310,11 @@ where
     /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self {
-        unimplemented!()
+        if dims.len() != 1 {
+            unimplemented!("Only single dimension sum is supported at the moment.");
+        } else {
+            return self.single_dim_sum(dims[0]);
+        }
     }
 }
 
