@@ -3,7 +3,7 @@ use num_traits::Zero;
 use autodiff::node::Node;
 use interfaces::deep_learning::{DLModule, LinearLayer};
 use interfaces::tensors::{RealElement, RealTensor, Tensor};
-use neural_nets::LinLayer;
+use neural_nets::lin_layer::LinLayer;
 use tensors::TensorImpl;
 
 use std::marker::PhantomData;
@@ -61,7 +61,7 @@ impl MultiHeadAttention<Te, El, La> {
         let embed_dim = config.embed_dim;
         let num_heads = config.num_head;
         let seq_len = config.seq_len;
-        let batch_size = config.batch_size;
+        // let batch_size = config.batch_size;
         let d_k = config.embed_dim / config.num_head;
         let mask: Option<Te> = if is_masked {
             let mut mask: Vec<Node<f64>> = vec![Node::<f64>::zero(); seq_len * seq_len];
@@ -75,7 +75,8 @@ impl MultiHeadAttention<Te, El, La> {
                     }
                 }
             }
-            Some(Te::from_vec(&vec![batch_size, seq_len, seq_len], &mask).unwrap())
+            // Some(Te::from_vec(&vec![batch_size, seq_len, seq_len], &mask).unwrap())
+            Some(Te::from_vec(&vec![seq_len, seq_len], &mask).unwrap())
         } else {
             None
         };
@@ -173,8 +174,8 @@ mod tests {
             batch_size: 2,
             vocab_size: 10,
             seq_len: 5,
-            embed_dim: 4,
-            num_head: 3,
+            embed_dim: 20,
+            num_head: 4,
         }
     }
 
@@ -182,12 +183,12 @@ mod tests {
     fn test_construct() {
         let config = get_config();
         let attention = MultiHeadAttention::new(&config, true);
-        assert_eq!(attention.num_heads, 3);
+        assert_eq!(attention.num_heads, 4);
         assert!(attention.mask.is_some());
         // check that mask has the right shape
         // print the shape of the mask
-        println!("{:?}", attention.mask.as_ref().unwrap().shape());
-        assert_eq!(attention.mask.unwrap().shape(), vec![1, 5, 5]);
+        //println!("{:?}", attention.mask.as_ref().unwrap().shape());
+        assert_eq!(attention.mask.unwrap().shape(), vec![5, 5]);
         //assert_eq!(attention.query_weights.len(), 3);
     }
 
@@ -196,9 +197,12 @@ mod tests {
         let config = get_config();
         let attention = MultiHeadAttention::new(&config, true);
 
-        // let x =
-        // TODO: make data
-
-        // TOOD: pass data through layer
+        let x = Te::from_vec(
+            &vec![config.batch_size, config.seq_len, config.embed_dim],
+            &vec![Node::<f64>::zero(); config.batch_size * config.seq_len * config.embed_dim],
+        )
+        .unwrap();
+        let out = attention.forward(&x).unwrap();
+        println!("{:?}", out);
     }
 }

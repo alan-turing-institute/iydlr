@@ -3,7 +3,7 @@ use interfaces::{
     deep_learning::{ActivationLayer, DLModule, LinearLayer},
     tensors::{RealElement, Tensor},
 };
-use std::{marker::PhantomData, process::Output};
+use std::marker::PhantomData;
 
 // keras_nlp.layers.TransformerEncoder(
 //     intermediate_dim,

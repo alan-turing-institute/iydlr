@@ -115,7 +115,12 @@ impl<E: Element> TensorImpl<E> {
                             + j_inner * self_strides[self_num_dims - 1];
                         let other_idx = j2 * other_strides[other_num_dims - 2]
                             + j_inner * other_strides[other_num_dims - 1];
-                        accumulator += self.data[self_idx].clone() * other.data[other_idx].clone();
+
+                        // TODO: since AddAssign is not impl for Node currently, just use Add.
+                        // Revert this once AddAssign is implemented.
+                        // accumulator += self.data[self_idx].clone() * other.data[other_idx].clone();
+                        accumulator = accumulator
+                            + self.data[self_idx].clone() * other.data[other_idx].clone();
                     }
                     new_data.push(accumulator);
                 }
