@@ -26,7 +26,7 @@ where
     pub key_weights: Vec<L>,
     pub value_weights: Vec<L>,
     pub num_heads: usize,
-    pub mask: T,
+    pub mask: Option<T>,
     pub _marker_t: PhantomData<T>,
     pub _marker_e: PhantomData<E>,
 }
@@ -37,28 +37,32 @@ where
     T: Tensor<E>,
     E: RealElement,
 {
-    pub fn new(x: &T, num_heads: usize) -> Self {
+    pub fn new(x: &T, num_heads: usize, is_masked: bool) -> Self {
         // Generate weights tensors W_Q, W_K, W_V with shapes (embedding_dim, d_k),
         // where d_k is embedding_dim / num_heads. For now, we assume num_heads = 1.
         // Then generate W_Q, W_K, W_V with same shape (batch x sequence x channel)
         let v = x.shape();
         let (batch_size, seq_len, embedding_dim) = (v[0], v[1], v[2]);
         let _d_k = embedding_dim / num_heads;
-        let mut mask = Vec::with_capacity(x.shape().into_iter().product());
-        let matrix_dim = seq_len;
-        for i in 0..batch_size {
-            for j in 0..matrix_dim {
-                for k in 0..matrix_dim {
-                    if k >= j {
-                        mask[j * matrix_dim + k] = E::zero();
-                    } else {
-                        mask[j * matrix_dim + k] = E::neg_inf();
+
+        let mask: Option<T> = if is_masked {
+            let mut mask = Vec::with_capacity(x.shape().into_iter().product());
+            let matrix_dim = seq_len;
+            for i in 0..batch_size {
+                for j in 0..matrix_dim {
+                    for k in 0..matrix_dim {
+                        if k >= j {
+                            mask[j * matrix_dim + k] = E::zero();
+                        } else {
+                            mask[j * matrix_dim + k] = E::neg_inf();
+                        }
                     }
                 }
             }
-        }
-
-        let mask = T::from_vec(&vec![batch_size, seq_len, seq_len], &mask);
+            Some(T::from_vec(&vec![batch_size, seq_len, seq_len], &mask).unwrap())
+        } else {
+            None
+        };
 
         // TODO: no constructor currently, come back to when concrete type to implement on
         // let query_weights: Vec<L> = (0..num_heads).map(|_| L::new(embedding_dim, d_k)).collect();
@@ -77,7 +81,6 @@ where
 
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
         let mut outputs: Vec<T> = vec![];
-        let masked_x: T = self.mask.clone() * x.clone(); // element-wise multiplication
         for attention_head_idx in 0..self.num_heads {
             // TODO: fix unwraps once error conversion is handled
             let query = self.query_weights[attention_head_idx].forward(x).unwrap(); // just a matmul, Unwrap used since we currently do not have conversion implemented
@@ -91,9 +94,15 @@ where
                 E::from((last_dim_of_keys as f64).powf(-0.5));
 
             // softmax along the sequence length, TODO: check correct dim for softmax
-            let att_masked_softmax: T = (att * masked_x.clone()).softmax(1);
+            let att: T = if let Some(mask) = &self.mask {
+                let masked_x: T = mask.clone() * x.clone(); // element-wise multiplication
+                att * masked_x
+            } else {
+                att
+            };
+            let att = att.softmax(1);
             // matmul attention masked with V
-            let att_v: T = att_masked_softmax.matmul(&value).unwrap();
+            let att_v: T = att.matmul(&value).unwrap();
             outputs.push(att_v);
         }
 
