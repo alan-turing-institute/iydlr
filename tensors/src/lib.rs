@@ -9,7 +9,7 @@ use std::{
 
 /// Implementation of multidimensional arrays as row major strided vectors.
 #[derive(Debug, Clone, PartialEq)]
-struct TensorImpl<E>
+pub struct TensorImpl<E>
 where
     E: Element,
 {
