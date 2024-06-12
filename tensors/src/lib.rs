@@ -166,17 +166,10 @@ impl<E: Element> TensorImpl<E> {
 
         let mut self_idx: Vec<usize> = vec![0; num_dims];
         let mut other_idx: Vec<usize> = vec![0; num_dims];
-        let mut result_idx: Vec<usize> = vec![0; num_dims];
         let mut which_index_to_increment: usize;
         while new_data.len() != result_num_elements {
-            dbg!("---");
-            dbg!(&self_idx);
-            dbg!(&other_idx);
-            dbg!(&result_idx);
             let self_element = self.at(self_idx.clone()).unwrap();
             let other_element = other.at(other_idx.clone()).unwrap();
-            //let result_element = result.at_mut(result_idx.clone()).unwrap();
-            //*result_element = self_element.clone() + other_element.clone();
             new_data.push(self_element.clone() + other_element.clone());
 
             // Increment the indices
@@ -190,22 +183,17 @@ impl<E: Element> TensorImpl<E> {
                     which_index_to_increment -= 1;
                 }
             }
-            dbg!(which_index_to_increment);
             if self.shape[which_index_to_increment] != 1 {
                 self_idx[which_index_to_increment] += 1;
             }
-            for i in (which_index_to_increment + 1)..(num_dims) {
+            for i in (which_index_to_increment + 1)..num_dims {
                 self_idx[i] = 0;
             }
             if other.shape[which_index_to_increment] != 1 {
                 other_idx[which_index_to_increment] += 1;
             }
-            for i in (which_index_to_increment + 1)..(num_dims) {
+            for i in (which_index_to_increment + 1)..num_dims {
                 other_idx[i] = 0;
-            }
-            result_idx[which_index_to_increment] += 1;
-            for i in (which_index_to_increment + 1)..(num_dims) {
-                result_idx[i] = 0;
             }
         }
         let result = Self {
@@ -314,7 +302,6 @@ impl<E: Element> Div<E> for TensorImpl<E> {
         TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 }
-
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
@@ -517,7 +504,7 @@ where
 }
 
 impl<E: RealElement> Exp for TensorImpl<E> {
-    fn exp(self) -> Self{
+    fn exp(self) -> Self {
         let new_data = self.data.iter().map(|x| x.clone().exp()).collect();
         TensorImpl {
             shape: self.shape,
