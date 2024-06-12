@@ -383,19 +383,31 @@ where
 
 impl<E: RealElement> Exp for TensorImpl<E> {
     fn exp(self) -> Self{
-        todo!()
+        let new_data = self.data.iter().map(|x| x.clone().exp()).collect();
+        TensorImpl {
+            shape: self.shape,
+            data: new_data,
+        }
     }
 }
 
 impl<E: RealElement> Pow<E> for TensorImpl<E> {
     fn pow(self, exp: E) -> Self{
-        todo!()
+        let new_data = self.data.iter().map(|x| x.clone().pow(exp.clone())).collect();
+        TensorImpl {
+            shape: self.shape,
+            data: new_data,
+        }
     }
 }
 
 impl<E: RealElement> Ln for TensorImpl<E> {
     fn ln(self) -> Self{
-        todo!()
+        let new_data = self.data.iter().map(|x| x.clone().ln()).collect();
+        TensorImpl {
+            shape: self.shape,
+            data: new_data,
+        }
     }
 }
 
@@ -738,5 +750,35 @@ mod tests {
         let data = vec![1, 2, 3, 4, 5, 6];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
         assert_eq!(Vec::<i32>::from(tensor), data);
+    }
+
+    #[test]
+    fn test_element_exp() {
+        let shape = vec![2, 1];
+        let data = vec![1.0, 2.0];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let expected_data = vec![2.718281828459045, 7.38905609893065];
+        let tensor_exp = tensor.exp();
+        assert_eq!(tensor_exp.data, expected_data);
+    }
+
+    #[test]
+    fn test_element_pow() {
+        let shape = vec![2, 1];
+        let data = vec![1.0, 2.0];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let expected_data = vec![1.0, 4.0];
+        let tensor_pow = tensor.pow(2.0);
+        assert_eq!(tensor_pow.data, expected_data);
+    }
+
+    #[test]
+    fn test_element_ln() {
+        let shape = vec![2, 1];
+        let data = vec![2.718281828459045, 7.38905609893065];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let expected_data = vec![1.0, 2.0];
+        let tensor_ln = tensor.ln();
+        assert_eq!(tensor_ln.data, expected_data);
     }
 }

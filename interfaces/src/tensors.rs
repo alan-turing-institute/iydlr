@@ -48,7 +48,15 @@ where
 
 /// Collection of traits required by the elements of a Tensor.
 pub trait Element:
-    Debug + Clone + PartialEq + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self> + Zero
+    Debug
+    + Clone
+    + PartialEq
+    + Display
+    + Add<Output = Self>
+    + AddAssign
+    + Mul<Output = Self>
+    + Div<Output = Self>
+    + Zero
 {
 }
 
