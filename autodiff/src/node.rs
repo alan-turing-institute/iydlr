@@ -102,7 +102,7 @@ impl<T: RealElement + From<f64>> NodePtr<T> {
                 np.propagate_backward();
             }
             Node::Ln(_, _, ref mut np) => {
-                np.add_assign_grad(self_grad * <f64 as Into<T>>::into(1_f64) / self_val);
+                np.add_assign_grad(self_grad * <f64 as Into<T>>::into(1_f64) / np.val());
                 np.propagate_backward();
             }
             // Node::Ln(_, _, ref mut n) => n.add_assign_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
@@ -726,4 +726,26 @@ mod tests {
         // So, w.r.t. the x node, the grad is df/dx(3) = 12 + 5 * exp(15) = 16345098.862360553196509
         assert_eq!(node_x.grad().unwrap(), 16345098.862360553196509_f64);
     }
+
+    #[test]
+    fn test_overly_complicated_identity_function() {
+        // Expression: f(x) = exp(
+        //  x*(
+        //    ln(
+        //     (x+3.14)
+        //    )/x
+        //   )
+        // ) - 3.14 = x
+        let node_x = NodePtr::new(Node::new(3.0, None));
+        let node_314 = NodePtr::new(Node::new(3.14, None));
+        let node_1 = node_x.clone() + node_314.clone();
+        let node_1 = node_1.clone().ln();
+        let node_1 = node_1.clone() * node_x.clone().pow(NodePtr::from(-1.0));
+        let node_1 = node_1.clone() * node_x.clone();
+        let node_1 = node_1.clone().exp();
+        let node_1 = node_1.clone() + (NodePtr::from(-1.0) * node_314.clone());
+        let node_1 = node_1.backward(1.0);
+        assert!(f64::abs(node_x.grad().unwrap() - 1.0_f64) < 1e-10);
+    }
+
 }
