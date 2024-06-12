@@ -1,9 +1,9 @@
+use num::traits::Zero;
 use std::{
+    cmp::PartialEq,
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul},
-    cmp::{PartialEq},
 };
-use num::traits::Zero;
 
 use crate::utils::{Exp, Ln, Pow};
 
@@ -44,6 +44,8 @@ where
     /// Sum across one or more dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     /// vector")
     fn dim_sum(&self, dims: Vec<usize>) -> Self;
+
+    fn concat(&self, other: &Self, dim: usize) -> Result<Self, Self::TensorError>;
 }
 
 /// Collection of traits required by the elements of a Tensor.
@@ -59,7 +61,6 @@ pub trait Element:
     + Zero
 {
 }
-
 
 /// A Subtrait of `Tensor`, extending the interface to include methods that require more
 /// "real number like" behaviour from the tensor elements. The `RealTensor` element must be an
