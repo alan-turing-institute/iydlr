@@ -1,6 +1,7 @@
 use anyhow::Error;
 use interfaces::tensors::{Element, RealElement, RealTensor, Tensor};
 use interfaces::utils::{Exp, Ln, Pow};
+use std::ops::Div;
 use std::{
     fmt::Debug,
     ops::{Add, Mul},
@@ -220,6 +221,25 @@ impl<E: Element> Mul<E> for TensorImpl<E> {
         TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 }
+
+/// Dividing tensor by a scalar.
+impl<E: Element> Div<E> for TensorImpl<E> {
+    type Output = Self;
+
+    fn div(self, scalar: E) -> Self {
+        if scalar == E::zero() {
+            panic!("Division by zero.");
+        }
+        let data: Vec<E> = self
+            .data
+            .iter()
+            .map(|a| a.clone() / scalar.clone())
+            .collect();
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+}
+
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
@@ -453,10 +473,14 @@ impl<E: RealElement> Ln for TensorImpl<E> {
 
 impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
-        todo!();
-        let data_exp = self.exp();
+
+        let data_exp = self.clone().exp();
         let data_sum = data_exp.dim_sum(vec![dim]);
 
+        println!("data_exp.shape(): {:?}", data_exp.shape());
+        println!("data_sum.shape(): {:?}", data_sum.shape());
+
+        todo!()
     }
 
     fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
@@ -651,6 +675,22 @@ mod tests {
         let tensor2 = tensor * 10;
         assert_eq!(tensor2.data, vec![10, 20, 30, 40, 50, 60]);
     }
+
+    #[test]
+    #[should_panic(expected = "Division by zero")]
+    fn test_div_tensor_by_scalar() {
+        let shape = vec![2, 3];
+        let data = vec![10, 20, 30, 40, 50, 60];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+
+        let tensor2 = tensor.clone() / 10;
+        assert_eq!(tensor2.data, vec![1, 2, 3, 4, 5, 6]);
+
+        // This line should panic, because division by zero is not allowed
+        let _tensor3 = tensor.clone() / 0;
+    }
+
+
 
     #[test]
     fn test_single_dim_sum() {
@@ -995,4 +1035,18 @@ mod tests {
             assert_eq!(result1.data, result2.data);
         }
     }
+
+    #[test]
+    fn test_softmax() {
+        let shape = vec![2, 1];
+        let data = vec![1.0, 2.0];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let result = tensor.softmax(0);
+        let expected_data = vec![
+            0.09003057317038046,
+            0.24472847105479764,
+        ];
+        assert_eq!(result.data, expected_data);
+    }
+
 }

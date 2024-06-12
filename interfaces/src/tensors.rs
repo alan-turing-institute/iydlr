@@ -19,6 +19,7 @@ pub trait Tensor<E>:
     + Add<E, Output = Self>
     + Mul<Output = Self>
     + Mul<E, Output = Self>
+    + Div<E, Output = Self>
     + Into<Vec<E>>
 where
     E: Element,
