@@ -24,7 +24,9 @@ where
         let input_shape = x.shape();
         // The shape of the input tensor must be (B, T, C)
         if input_shape.len() != 3 {
-            panic!("The shape of the input tensor must be (B, T, C)");
+            return Err(
+                anyhow::Error::msg("The shape of the input tensor must be (B, T, C)").into(),
+            );
         } else {
             return Ok(x.clone().matmul(&self.w.clone())? + self.b.clone());
         }
