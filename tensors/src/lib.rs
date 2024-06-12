@@ -3,7 +3,7 @@ use interfaces::tensors::{Element, RealElement, RealTensor, Tensor};
 use interfaces::utils::{Exp, Ln, Pow};
 use std::{
     fmt::Debug,
-    ops::{Add, Mul},
+    ops::{Add, Div, Mul, Sub},
     vec::Vec,
 };
 
@@ -130,6 +130,156 @@ impl<E: Element> TensorImpl<E> {
             data: new_data,
         });
     }
+
+    fn add_same_shape(self, other: Self) -> Self {
+        let data: Vec<E> = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
+            .map(|(a, b)| a.clone() + b.clone())
+            .collect();
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+
+    fn add_broadcast(self, other: Self) -> Self {
+        if self.num_dims() != other.num_dims() {
+            panic!("Shapes are not compatible for element-wise operations.");
+        }
+        let num_dims = self.num_dims();
+        for i in 0..self.shape.len() {
+            if self.shape[i] != other.shape[i] && self.shape[i] != 1 && other.shape[i] != 1 {
+                panic!("Shapes are not compatible for element-wise operations.");
+            }
+        }
+
+        let new_shape: Vec<usize> = self
+            .shape
+            .iter()
+            .zip(other.shape.iter())
+            .map(|(a, b)| std::cmp::max(a, b).clone())
+            .collect();
+        let result_num_elements = num_elements_from_shape(&new_shape);
+        let mut new_data: Vec<E> = Vec::with_capacity(result_num_elements);
+
+        let mut self_idx: Vec<usize> = vec![0; num_dims];
+        let mut other_idx: Vec<usize> = vec![0; num_dims];
+        let mut which_index_to_increment: usize;
+        while new_data.len() != result_num_elements {
+            let self_element = self.at(self_idx.clone()).unwrap();
+            let other_element = other.at(other_idx.clone()).unwrap();
+            new_data.push(self_element.clone() + other_element.clone());
+
+            // Increment the indices
+            which_index_to_increment = num_dims - 1;
+            while self_idx[which_index_to_increment] == self.shape[which_index_to_increment] - 1
+                && other_idx[which_index_to_increment] == other.shape[which_index_to_increment] - 1
+            {
+                if which_index_to_increment == 0 {
+                    break;
+                } else {
+                    which_index_to_increment -= 1;
+                }
+            }
+            if self.shape[which_index_to_increment] != 1 {
+                self_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..num_dims {
+                self_idx[i] = 0;
+            }
+            if other.shape[which_index_to_increment] != 1 {
+                other_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..num_dims {
+                other_idx[i] = 0;
+            }
+        }
+        let result = Self {
+            shape: new_shape,
+            data: new_data,
+        };
+        return result;
+    }
+
+    fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
+        if self.shape() == other.shape() {
+            return self.elementwise_binary_op_same_shape(other, op);
+        } else {
+            return self.elementwise_binary_op_broadcast(other, op);
+        }
+    }
+
+    fn elementwise_binary_op_same_shape(self, other: Self, op: fn(E, E) -> E) -> Self {
+        let data: Vec<E> = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
+            .map(|(a, b)| op(a.clone(), b.clone()))
+            .collect();
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+
+    fn elementwise_binary_op_broadcast(self, other: Self, op: fn(E, E) -> E) -> Self {
+        if self.num_dims() != other.num_dims() {
+            panic!("Shapes are not compatible for element-wise operations.");
+        }
+        let num_dims = self.num_dims();
+        for i in 0..self.shape.len() {
+            if self.shape[i] != other.shape[i] && self.shape[i] != 1 && other.shape[i] != 1 {
+                panic!("Shapes are not compatible for element-wise operations.");
+            }
+        }
+
+        let new_shape: Vec<usize> = self
+            .shape
+            .iter()
+            .zip(other.shape.iter())
+            .map(|(a, b)| std::cmp::max(a, b).clone())
+            .collect();
+        let result_num_elements = num_elements_from_shape(&new_shape);
+        let mut new_data: Vec<E> = Vec::with_capacity(result_num_elements);
+
+        let mut self_idx: Vec<usize> = vec![0; num_dims];
+        let mut other_idx: Vec<usize> = vec![0; num_dims];
+        let mut which_index_to_increment: usize;
+        while new_data.len() != result_num_elements {
+            let self_element = self.at(self_idx.clone()).unwrap();
+            let other_element = other.at(other_idx.clone()).unwrap();
+            new_data.push(op(self_element.clone(), other_element.clone()));
+
+            // Increment the indices
+            which_index_to_increment = num_dims - 1;
+            while self_idx[which_index_to_increment] == self.shape[which_index_to_increment] - 1
+                && other_idx[which_index_to_increment] == other.shape[which_index_to_increment] - 1
+            {
+                if which_index_to_increment == 0 {
+                    break;
+                } else {
+                    which_index_to_increment -= 1;
+                }
+            }
+            if self.shape[which_index_to_increment] != 1 {
+                self_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..num_dims {
+                self_idx[i] = 0;
+            }
+            if other.shape[which_index_to_increment] != 1 {
+                other_idx[which_index_to_increment] += 1;
+            }
+            for i in (which_index_to_increment + 1)..num_dims {
+                other_idx[i] = 0;
+            }
+        }
+        let result = Self {
+            shape: new_shape,
+            data: new_data,
+        };
+        return result;
+    }
 }
 
 impl<E: Element> IntoIterator for TensorImpl<E> {
@@ -152,19 +302,34 @@ impl<E: Element> Add for TensorImpl<E> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        if self.shape() != other.shape() {
-            panic!("Shapes are not compatible for element-wise operations.");
-        }
+        self.elementwise_binary_op(other, |a, b| a + b)
+    }
+}
 
-        let data: Vec<E> = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
-            .map(|(a, b)| a.clone() + b.clone())
-            .collect();
-        // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+/// Dividing to two tensors elementwise.
+impl<E: Element> Div for TensorImpl<E> {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        self.elementwise_binary_op(other, |a, b| a / b)
+    }
+}
+
+/// Multiplying to two tensors elementwise.
+impl<E: Element> Mul for TensorImpl<E> {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        self.elementwise_binary_op(other, |a, b| a * b)
+    }
+}
+
+/// Subtracting to two tensors elementwise.
+impl<E: Element + Sub<Output = E>> Sub for TensorImpl<E> {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        self.elementwise_binary_op(other, |a, b| a - b)
     }
 }
 
@@ -184,27 +349,6 @@ impl<E: Element> Add<E> for TensorImpl<E> {
     }
 }
 
-/// Multiplying to two tensors together elementwise.
-impl<E: Element> Mul for TensorImpl<E> {
-    type Output = Self;
-
-    fn mul(self, other: Self) -> Self {
-        if self.shape() != other.shape() {
-            panic!("Shapes are not compatible for element-wise operations.");
-        }
-
-        let data: Vec<E> = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
-            .map(|(a, b)| a.clone() * b.clone())
-            .collect();
-        // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(&self.shape(), &data).unwrap()
-    }
-}
-
 /// Multiplying tensor by a scalar.
 impl<E: Element> Mul<E> for TensorImpl<E> {
     type Output = Self;
@@ -215,6 +359,24 @@ impl<E: Element> Mul<E> for TensorImpl<E> {
             .iter()
             // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
             .map(|a| a.clone() * scalar.clone())
+            .collect();
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+}
+
+/// Dividing tensor by a scalar.
+impl<E: Element> Div<E> for TensorImpl<E> {
+    type Output = Self;
+
+    fn div(self, scalar: E) -> Self {
+        if scalar == E::zero() {
+            panic!("Division by zero.");
+        }
+        let data: Vec<E> = self
+            .data
+            .iter()
+            .map(|a| a.clone() / scalar.clone())
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
         TensorImpl::from_vec(&self.shape(), &data).unwrap()
@@ -408,21 +570,8 @@ where
                     let idx = lead_idx * self.shape[dim] * trailing_dims
                         + summing_idx * trailing_dims
                         + trail_idx;
-                    // let idx = summing_idx + lead_idx + (trail_idx * leading_dims);
-
-                    // sum += original[lead_idx,summing_idx,trail_idx]
                     sum += self.data[idx].clone();
                 }
-                // for (j, value) in self.data.iter().enumerate() {
-                //     // print value of i, j and value
-                //     let a = j % leading_dims;
-                //     let b = j % trailing_dims;
-
-                //     if j % self.shape[dim] == trail_idx {
-                //         sum += value.clone();
-                //     }
-                //     println!("i: {}, j: {}, a: {}, b: {}, value: {}, sum: {}", trail_idx, j, a, b, value, sum);
-                // }
                 dim_sum.push(sum);
             }
         }
@@ -436,24 +585,46 @@ where
 
 impl<E: RealElement> Exp for TensorImpl<E> {
     fn exp(self) -> Self {
-        todo!()
+        let new_data = self.data.iter().map(|x| x.clone().exp()).collect();
+        TensorImpl {
+            shape: self.shape,
+            data: new_data,
+        }
     }
 }
 
 impl<E: RealElement> Pow<E> for TensorImpl<E> {
     fn pow(self, exp: E) -> Self {
-        todo!()
+        let new_data = self
+            .data
+            .iter()
+            .map(|x| x.clone().pow(exp.clone()))
+            .collect();
+        TensorImpl {
+            shape: self.shape,
+            data: new_data,
+        }
     }
 }
 
 impl<E: RealElement> Ln for TensorImpl<E> {
     fn ln(self) -> Self {
-        todo!()
+        let new_data = self.data.iter().map(|x| x.clone().ln()).collect();
+        TensorImpl {
+            shape: self.shape,
+            data: new_data,
+        }
     }
 }
 
 impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
+        let data_exp = self.clone().exp();
+        let data_sum = data_exp.dim_sum(vec![dim]);
+
+        println!("data_exp.shape(): {:?}", data_exp.shape());
+        println!("data_sum.shape(): {:?}", data_sum.shape());
+
         todo!()
     }
 
@@ -466,6 +637,22 @@ impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
 mod tests {
     use super::*;
     use rand::Rng;
+
+    fn make_random_f64_tensor(
+        rng: &mut rand::rngs::ThreadRng,
+        shape: Vec<usize>,
+    ) -> TensorImpl<f64> {
+        let data: Vec<f64> = (0..num_elements_from_shape(&shape))
+            .map(|_| rng.gen::<f64>())
+            .collect();
+        TensorImpl::from_vec(&shape, &data).unwrap()
+    }
+
+    fn make_range_tensor(shape: Vec<usize>) -> TensorImpl<i32> {
+        let num_elements: i32 = num_elements_from_shape(&shape).try_into().unwrap();
+        let data = (0..num_elements).collect::<Vec<i32>>();
+        TensorImpl { shape, data }
+    }
 
     #[test]
     fn test_from_vec() {
@@ -538,42 +725,33 @@ mod tests {
 
     #[test]
     fn test_transpose_3d_tensor() {
-        let shape = vec![3, 4, 5];
-        let original_data = (1..61).collect::<Vec<i32>>();
-
-        let tensor = TensorImpl::from_vec(&shape, &original_data).unwrap();
+        let tensor = make_range_tensor(vec![3, 4, 5]);
         let transposed = tensor.transpose();
         let expected_shape = vec![3, 5, 4];
         assert_eq!(transposed.shape(), expected_shape);
 
         // The data should be different from the original tensor
-        assert_ne!(transposed.data, original_data);
+        assert_ne!(transposed.data, tensor.data);
 
         // Transposing twice should return the original tensor
         let transposed_twice = transposed.transpose();
-        assert_eq!(transposed_twice.shape(), shape);
-        assert_eq!(transposed_twice.data, original_data);
+        assert_eq!(transposed_twice.shape(), tensor.shape);
+        assert_eq!(transposed_twice.data, tensor.data);
     }
 
     #[test]
     fn test_at() {
-        let shape = vec![3, 2, 2];
-        let original_data = (1..13).collect::<Vec<i32>>();
-        let tensor = TensorImpl::from_vec(&shape, &original_data).unwrap();
-
-        assert_eq!(*tensor.at(vec![0, 0, 0]).unwrap(), 1);
-        assert_eq!(*tensor.at(vec![2, 1, 1]).unwrap(), 12);
+        let tensor = make_range_tensor(vec![3, 2, 2]);
+        assert_eq!(*tensor.at(vec![0, 0, 0]).unwrap(), 0);
+        assert_eq!(*tensor.at(vec![2, 1, 1]).unwrap(), 11);
         assert_eq!(tensor.at(vec![2, 1, 2]), None);
-        assert_eq!(*tensor.at(vec![1, 1, 0]).unwrap(), 7);
-        assert_eq!(*tensor.at(vec![1, 0, 1]).unwrap(), 6);
+        assert_eq!(*tensor.at(vec![1, 1, 0]).unwrap(), 6);
+        assert_eq!(*tensor.at(vec![1, 0, 1]).unwrap(), 5);
     }
 
     #[test]
     fn test_at_mut() {
-        let shape = vec![3, 2, 2];
-        let original_data = (1..13).collect::<Vec<i32>>();
-        let mut tensor = TensorImpl::from_vec(&shape, &original_data).unwrap();
-
+        let mut tensor = make_range_tensor(vec![3, 2, 2]);
         let index = vec![2, 0, 1];
         let element = tensor.at_mut(index.clone()).unwrap();
         *element = 100;
@@ -651,6 +829,20 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "Division by zero")]
+    fn test_div_tensor_by_scalar() {
+        let shape = vec![2, 3];
+        let data = vec![10, 20, 30, 40, 50, 60];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+
+        let tensor2 = tensor.clone() / 10;
+        assert_eq!(tensor2.data, vec![1, 2, 3, 4, 5, 6]);
+
+        // This line should panic, because division by zero is not allowed
+        let _tensor3 = tensor.clone() / 0;
+    }
+
+    #[test]
     fn test_single_dim_sum() {
         let shape = vec![2, 2, 2];
         let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
@@ -677,12 +869,7 @@ mod tests {
 
     #[test]
     fn test_multiple_dim_sum() {
-        let original_shape = vec![2, 3, 4, 5];
-        let original_data_len = original_shape.iter().product::<usize>();
-        let opiginal_data = (1..original_data_len + 1).collect::<Vec<usize>>();
-
-        let tensor = TensorImpl::from_vec(&original_shape, &opiginal_data).unwrap();
-
+        let tensor = make_range_tensor(vec![2, 3, 4, 5]);
         // Sum over dimensions 1 and 3
         // The result should have shape [2, 1, 4, 1]
         // The result should not be dependent of the order of the dimensions
@@ -751,17 +938,8 @@ mod tests {
     #[test]
     fn test_matmul_multidim() {
         let mut rng = rand::thread_rng();
-
-        let shape1 = vec![5, 4, 3, 2];
-        let num_elements1 = num_elements_from_shape(&shape1);
-        let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
-
-        let shape2 = vec![2, 6];
-        let num_elements2 = num_elements_from_shape(&shape2);
-        let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
-
+        let tensor1 = make_random_f64_tensor(&mut rng, vec![5, 4, 3, 2]);
+        let tensor2 = make_random_f64_tensor(&mut rng, vec![2, 6]);
         let result = tensor1.matmul(&tensor2).unwrap();
         let shape_expected = vec![5, 4, 3, 6];
         assert_eq!(result.shape, shape_expected);
@@ -793,27 +971,49 @@ mod tests {
     }
 
     #[test]
+    fn test_element_exp() {
+        let shape = vec![2, 1];
+        let data = vec![1.0, 2.0];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let expected_data = vec![2.718281828459045, 7.38905609893065];
+        let tensor_exp = tensor.exp();
+        assert_eq!(tensor_exp.data, expected_data);
+    }
+
+    #[test]
+    fn test_element_pow() {
+        let shape = vec![2, 1];
+        let data = vec![1.0, 2.0];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let expected_data = vec![1.0, 4.0];
+        let tensor_pow = tensor.pow(2.0);
+        assert_eq!(tensor_pow.data, expected_data);
+    }
+
+    #[test]
+    fn test_element_ln() {
+        let shape = vec![2, 1];
+        let data = vec![2.718281828459045, 7.38905609893065];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let expected_data = vec![1.0, 2.0];
+        let tensor_ln = tensor.ln();
+        assert_eq!(tensor_ln.data, expected_data);
+    }
+
+    #[test]
     fn test_concat() {
         let mut rng = rand::thread_rng();
 
         {
             // Concat over last dim
-            let shape1 = vec![5, 4, 3, 2];
-            let num_elements1 = num_elements_from_shape(&shape1);
-            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
-
-            let shape2 = vec![5, 4, 3, 3];
-            let num_elements2 = num_elements_from_shape(&shape2);
-            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
-
+            let tensor1 = make_random_f64_tensor(&mut rng, vec![5, 4, 3, 2]);
+            let tensor2 = make_random_f64_tensor(&mut rng, vec![5, 4, 3, 3]);
             let result = tensor1.concat(&tensor2, 3).unwrap();
             let shape_expected = vec![5, 4, 3, 5];
             assert_eq!(result.shape, shape_expected);
             // Check that the result has the same elements as the original, just in a different order.
-            let mut sorted_expected = data1.clone();
-            sorted_expected.extend(data2.clone());
+            let mut sorted_expected = tensor1.data.clone();
+            sorted_expected.extend(tensor2.data.clone());
             sorted_expected.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let mut sorted_elements = result.data.clone();
             sorted_elements.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -822,22 +1022,14 @@ mod tests {
 
         {
             // Concat over first dim
-            let shape1 = vec![5, 4, 3, 2];
-            let num_elements1 = num_elements_from_shape(&shape1);
-            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
-
-            let shape2 = vec![4, 4, 3, 2];
-            let num_elements2 = num_elements_from_shape(&shape2);
-            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
-
+            let tensor1 = make_random_f64_tensor(&mut rng, vec![5, 4, 3, 2]);
+            let tensor2 = make_random_f64_tensor(&mut rng, vec![4, 4, 3, 2]);
             let result = tensor1.concat(&tensor2, 0).unwrap();
             let shape_expected = vec![9, 4, 3, 2];
             assert_eq!(result.shape, shape_expected);
             // Check that the result has the same elements as the original, just in a different order.
-            let mut sorted_expected = data1.clone();
-            sorted_expected.extend(data2.clone());
+            let mut sorted_expected = tensor1.data.clone();
+            sorted_expected.extend(tensor2.data.clone());
             sorted_expected.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let mut sorted_elements = result.data.clone();
             sorted_elements.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -846,22 +1038,14 @@ mod tests {
 
         {
             // Concat over middle dim
-            let shape1 = vec![5, 4, 2, 2];
-            let num_elements1 = num_elements_from_shape(&shape1);
-            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
-
-            let shape2 = vec![5, 4, 3, 2];
-            let num_elements2 = num_elements_from_shape(&shape2);
-            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
-
+            let tensor1 = make_random_f64_tensor(&mut rng, vec![5, 4, 2, 2]);
+            let tensor2 = make_random_f64_tensor(&mut rng, vec![5, 4, 3, 2]);
             let result = tensor1.concat(&tensor2, 2).unwrap();
             let shape_expected = vec![5, 4, 5, 2];
             assert_eq!(result.shape, shape_expected);
             // Check that the result has the same elements as the original, just in a different order.
-            let mut sorted_expected = data1.clone();
-            sorted_expected.extend(data2.clone());
+            let mut sorted_expected = tensor1.data.clone();
+            sorted_expected.extend(tensor2.data.clone());
             sorted_expected.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let mut sorted_elements = result.data.clone();
             sorted_elements.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -876,21 +1060,9 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         {
-            let shape1 = vec![3, 2];
-            let num_elements1 = num_elements_from_shape(&shape1);
-            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
-
-            let shape2 = vec![3, 4];
-            let num_elements2 = num_elements_from_shape(&shape2);
-            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
-
-            let shape3 = vec![3, 3];
-            let num_elements3 = num_elements_from_shape(&shape3);
-            let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
-            let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
-
+            let tensor1 = make_random_f64_tensor(&mut rng, vec![3, 2]);
+            let tensor2 = make_random_f64_tensor(&mut rng, vec![3, 4]);
+            let tensor3 = make_random_f64_tensor(&mut rng, vec![3, 3]);
             let result1 = tensor3
                 .matmul(&tensor1.concat(&tensor2, 1).unwrap())
                 .unwrap();
@@ -904,21 +1076,9 @@ mod tests {
         }
 
         {
-            let shape1 = vec![3, 2];
-            let num_elements1 = num_elements_from_shape(&shape1);
-            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
-
-            let shape2 = vec![4, 2];
-            let num_elements2 = num_elements_from_shape(&shape2);
-            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
-
-            let shape3 = vec![2, 2];
-            let num_elements3 = num_elements_from_shape(&shape3);
-            let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
-            let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
-
+            let tensor1 = make_random_f64_tensor(&mut rng, vec![3, 2]);
+            let tensor2 = make_random_f64_tensor(&mut rng, vec![4, 2]);
+            let tensor3 = make_random_f64_tensor(&mut rng, vec![2, 2]);
             let result1 = &tensor1
                 .concat(&tensor2, 0)
                 .unwrap()
@@ -934,21 +1094,9 @@ mod tests {
         }
 
         {
-            let shape1 = vec![2, 3, 2];
-            let num_elements1 = num_elements_from_shape(&shape1);
-            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
-
-            let shape2 = vec![4, 3, 2];
-            let num_elements2 = num_elements_from_shape(&shape2);
-            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
-
-            let shape3 = vec![2, 2];
-            let num_elements3 = num_elements_from_shape(&shape3);
-            let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
-            let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
-
+            let tensor1 = make_random_f64_tensor(&mut rng, vec![2, 3, 2]);
+            let tensor2 = make_random_f64_tensor(&mut rng, vec![4, 3, 2]);
+            let tensor3 = make_random_f64_tensor(&mut rng, vec![2, 2]);
             let result1 = &tensor1
                 .concat(&tensor2, 0)
                 .unwrap()
@@ -961,6 +1109,81 @@ mod tests {
                 .unwrap();
             assert_eq!(result1.shape, result2.shape);
             assert_eq!(result1.data, result2.data);
+        }
+    }
+
+    #[test]
+    fn test_softmax() {
+        let shape = vec![2, 1];
+        let data = vec![1.0, 2.0];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+        let result = tensor.softmax(0);
+        let expected_data = vec![0.09003057317038046, 0.24472847105479764];
+
+        todo!("Still need to determine the correct behaviour of the softmax function.");
+        assert_eq!(result.data, expected_data);
+    }
+
+    #[test]
+    fn test_add_broadcast() {
+        {
+            let tensor1 = make_range_tensor(vec![2, 3, 2]);
+            let tensor2 = make_range_tensor(vec![1, 3, 2]);
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 2, 4, 6, 8, 10, 6, 8, 10, 12, 14, 16];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let tensor1 = make_range_tensor(vec![2, 3, 2]);
+            let tensor2 = make_range_tensor(vec![2, 1, 2]);
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 2, 2, 4, 4, 6, 8, 10, 10, 12, 12, 14];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let tensor1 = make_range_tensor(vec![2, 3, 2]);
+            let tensor2 = make_range_tensor(vec![2, 3, 1]);
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let tensor1 = make_range_tensor(vec![2, 3, 2]);
+            let tensor2 = make_range_tensor(vec![2, 1, 1]);
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 3, 2];
+            let expected_data = vec![0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
+        }
+
+        {
+            let tensor1 = make_range_tensor(vec![2, 1, 3]);
+            let tensor2 = make_range_tensor(vec![1, 2, 1]);
+            let result1 = tensor1.clone() + tensor2.clone();
+            let result2 = tensor1 + tensor2;
+            let expected_shape = vec![2, 2, 3];
+            let expected_data = vec![0, 1, 2, 1, 2, 3, 3, 4, 5, 4, 5, 6];
+            let expected_result = TensorImpl::from_vec(&expected_shape, &expected_data).unwrap();
+            assert_eq!(result1, expected_result);
+            assert_eq!(result2, expected_result);
         }
     }
 }
