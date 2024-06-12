@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+attention = { version = "0.1.0", path = "../attention" }
+interfaces = { version = "0.1.0", path = "../interfaces" }
+neural_nets = { version = "0.1.0", path = "../neural_nets" }
