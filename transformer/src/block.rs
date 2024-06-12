@@ -5,37 +5,48 @@ use interfaces::{
 };
 use std::{marker::PhantomData, process::Output};
 
+// keras_nlp.layers.TransformerEncoder(
+//     intermediate_dim,
+//     num_heads,
+//     dropout=0,
+//     activation="relu",
+//     layer_norm_epsilon=1e-05,
+//     kernel_initializer="glorot_uniform",
+//     bias_initializer="zeros",
+//     normalize_first=False,
+//     **kwargs
+// )
+
 /// Expecting input as a Tensor with shape (B x T x C) where:
 ///   - B is batch size
 ///   - T is time
 ///   - C is channel.
-///
-struct Block<L, A, T, E, AL>
+/// Example from the keras API ([encoder](https://keras.io/api/keras_nlp/modeling_layers/transformer_encoder/))
+struct Block<L, A, T, E, Al>
 where
     L: LinearLayer<T, E>,
     A: SelfAttention<T, E>,
     T: Tensor<E>,
     E: RealElement,
-    AL: ActivationLayer<T, E>,
+    Al: ActivationLayer<T, E>,
 {
     pub self_attention: A,
     pub linear_layer1: L, // i: C, o: 4C
-    pub activation_layer: AL,
+    pub activation_layer: Al,
     pub linear_layer2: L, // i: 4C, o: C
-    // activation_layer:
-    // TODO: make an add layer
-    // add: Add,
-    _marker_t: PhantomData<T>,
+    pub intermediate_dim: usize,
+    pub num_head: usize,
+    pub _marker_t: PhantomData<T>,
     _marker_e: PhantomData<E>,
 }
 
-impl<T, E, L, A, AL> DLModule<T, E> for Block<L, A, T, E, AL>
+impl<T, E, L, A, Al> DLModule<T, E> for Block<L, A, T, E, Al>
 where
     L: LinearLayer<T, E>,
     A: SelfAttention<T, E>,
     T: Tensor<E>,
     E: RealElement,
-    AL: ActivationLayer<T, E>,
+    Al: ActivationLayer<T, E>,
 {
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
@@ -47,6 +58,7 @@ where
         // The first linear layer expands to 4 times the embedding dimension,
         // and the second linear layer projects back to the original embedding dimension.
 
+        // TODO: implement residual connections
         let att: T = self.self_attention.forward(x).unwrap();
         let residual1: T = att.clone() + x.clone();
 
@@ -54,17 +66,22 @@ where
         let act: T = self.activation_layer.forward(&lin).unwrap();
         let lin2: T = self.linear_layer2.forward(&act).unwrap();
 
-        Ok(lin2)
+        let residual2: T = lin2.clone() + residual1.clone();
+
+        Ok(residual2)
     }
-    //
-    // }
 
     fn params(&self) -> Vec<E> {
         todo!()
     }
 }
 
-struct Transformer {}
+// TODO: once activation is concrete
+// impl Block<LinLayer, MultiHeadAttention, TensorImpl, Node<f64>, > {
+//     fn new() -> Self {
+//         todo!()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

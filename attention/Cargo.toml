@@ -5,4 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
+autodiff = { version = "0.1.0", path = "../autodiff" }
 interfaces = { version = "0.1.0", path = "../interfaces" }
+neural_nets = { version = "0.1.0", path = "../neural_nets" }
+num-traits = "0.2.19"
+tensors = { version = "0.1.0", path = "../tensors" }
