@@ -194,6 +194,14 @@ impl<T: RealElement + From<f64>> Mul<Node<T>> for Node<T> {
     }
 }
 
+impl<T: RealElement + From<f64>> Mul<NodePtr<T>> for NodePtr<T> {
+    type Output = NodePtr<T>;
+
+    fn mul(self, rhs: NodePtr<T>) -> Self::Output {
+        NodePtr::new(self.ptr.deref().borrow().to_owned() * rhs.ptr.deref().borrow().to_owned())
+    }
+}
+
 impl<T: RealElement + From<f64>> Div<Node<T>> for Node<T> {
     type Output = Node<T>;
 
@@ -378,6 +386,19 @@ mod tests {
         let result = node1 * node2;
         assert_eq!(result.val(), &68.82_f64);
         assert_eq!(result.grad(), &None);
+    }
+
+    #[test]
+    fn test_mul_node_ptr() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
+
+        let np1 = NodePtr::new(node1);
+        let np2 = NodePtr::new(node2);
+
+        let result = np1 * np2;
+        assert_eq!(result.val(), 68.82_f64);
+        assert_eq!(result.grad(), None);
     }
 
     #[test]
