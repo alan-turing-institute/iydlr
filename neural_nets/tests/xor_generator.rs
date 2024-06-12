@@ -63,7 +63,7 @@ mod tests {
         for batch_size in [1, 55, 77777] {
             let (x, y) = single_xor_batch(batch_size);
 
-            assert_eq!(x.get_shape(), &vec![1, batch_size, 2]);
+            assert_eq!(x.shape(), vec![1, batch_size, 2]);
             assert_eq!(y.len(), batch_size);
         }
     }
@@ -76,7 +76,7 @@ mod tests {
         for _ in 0..10 {
             let (x, y) = generator.next().unwrap();
 
-            assert_eq!(x.get_shape(), &vec![1, batch_size, 2]);
+            assert_eq!(x.shape(), vec![1, batch_size, 2]);
             assert_eq!(y.len(), batch_size);
         }
     }
