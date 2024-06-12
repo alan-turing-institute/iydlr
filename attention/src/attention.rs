@@ -120,30 +120,63 @@ where
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
         let mut outputs: Vec<T> = vec![];
         for attention_head_idx in 0..self.num_heads {
+            let mut batch_outs: Vec<T> = vec![];
+            let shape = x.shape();
             // TODO: fix unwraps once error conversion is handled
-            let query = self.query_weights[attention_head_idx].forward(x).unwrap(); // just a matmul, Unwrap used since we currently do not have conversion implemented
-            println!("{:?}", x.shape());
-            let key: T = self.key_weights[attention_head_idx].forward(x).unwrap(); // B x T x d_k (C / num_heads)
-            println!("{:?}", key.shape());
-            let value: T = self.value_weights[attention_head_idx].forward(x).unwrap();
-            let last_dim_of_keys = *key.shape().last().unwrap(); // d_k
+            let x_batch: Vec<E> = x.clone().into();
+            // let x_batch = x_batch.chunks(shape[1] * shape[2]).into_iter().enumerate();
+            let x_batch: Vec<Vec<E>> = x_batch
+                .chunks(shape[1] * shape[2])
+                .map(|chunk| chunk.to_vec())
+                .collect();
 
-            // make sure only last two dimensions are transposed
-            let att: T = query.matmul(&key.transpose()).unwrap() *
-                // TODO: make this safer
-                E::from((last_dim_of_keys as f64).powf(-0.5));
+            for (_, single_batch) in x_batch.into_iter().enumerate() {
+                let single_batch_tensor =
+                    T::from_vec(&vec![shape[1], shape[2]], &single_batch).unwrap();
+                // println!("{:?}", self.query_weights[attention_head_idx]);
+                let query = self.query_weights[attention_head_idx]
+                    .forward(&single_batch_tensor)
+                    .unwrap(); // just a matmul, Unwrap used since we currently do not have conversion implemented
+                println!("{:?}", x.shape());
+                let key: T = self.key_weights[attention_head_idx]
+                    .forward(&single_batch_tensor)
+                    .unwrap(); // B x T x d_k (C / num_heads)
+                println!("{:?}", key.shape());
+                let value: T = self.value_weights[attention_head_idx]
+                    .forward(&single_batch_tensor)
+                    .unwrap();
+                let last_dim_of_keys = *key.shape().last().unwrap(); // d_k
 
-            // softmax along the sequence length, TODO: check correct dim for softmax
-            let att: T = if let Some(mask) = &self.mask {
-                let masked_x: T = mask.clone() * x.clone(); // element-wise multiplication: (B x T x T)  x (B x T x C)
-                att * masked_x
-            } else {
-                att
-            };
-            let att = att.softmax(1);
-            // matmul attention masked with V
-            let att_v: T = att.matmul(&value).unwrap();
-            outputs.push(att_v);
+                // make sure only last two dimensions are transposed
+                let att: T = query.matmul(&key.transpose()).unwrap() *
+                    // TODO: make this safer
+                    E::from((last_dim_of_keys as f64).powf(-0.5));
+
+                // softmax along the sequence length, TODO: check correct dim for softmax
+                let att: T = if let Some(mask) = &self.mask {
+                    let masked_x: T = mask.clone() * x.clone(); // element-wise multiplication: (B x T x T)  x (B x T x C)
+                    att * masked_x
+                } else {
+                    att
+                };
+                // TODO: check softmax dim
+                // softmax now dim 0 (seq_len)
+                let att = att.softmax(0);
+                // matmul attention masked with V
+                let att_v: T = att.matmul(&value).unwrap();
+                batch_outs.push(att_v);
+            }
+
+            let outs_shape = batch_outs[0].shape();
+            let mut expected_shape = vec![shape[0]];
+            expected_shape.extend(outs_shape.into_iter());
+            let batch_outs_reshaped_as_single_vec: Vec<E> = batch_outs
+                .into_iter()
+                .flat_map(|batch_out| batch_out.into())
+                .collect();
+            let value = T::from_vec(&expected_shape, &batch_outs_reshaped_as_single_vec).unwrap();
+            // Reshape att_v to value
+            outputs.push(value)
         }
 
         // Concatanate over heads
