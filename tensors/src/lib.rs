@@ -381,7 +381,7 @@ impl<E: Element> Div<E> for TensorImpl<E> {
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
-    E: Element,
+    E: Element
 {
     type TensorError = AsStdError;
 
@@ -552,10 +552,6 @@ where
             .into_iter()
             .product::<usize>();
 
-        println!("leading_dims: {}", leading_dims);
-        println!("self.shape[dim]: {}", self.shape[dim]);
-        println!("trailing_dims: {}", trailing_dims);
-
         let mut output_shape = self.shape.clone();
         output_shape[dim] = 1;
         let output_size = output_shape.iter().product::<usize>();
@@ -622,10 +618,11 @@ impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
         let data_exp = self.clone().exp();
         let data_sum = data_exp.dim_sum(vec![dim]);
 
-        println!("data_exp.shape(): {:?}", data_exp.shape());
-        println!("data_sum.shape(): {:?}", data_sum.shape());
-
-        todo!()
+        let new_data = data_exp / data_sum;
+        TensorImpl {
+            shape: self.shape.clone(),
+            data: new_data.data,
+        }
     }
 
     fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
@@ -1114,14 +1111,30 @@ mod tests {
 
     #[test]
     fn test_softmax() {
-        let shape = vec![2, 1];
-        let data = vec![1.0, 2.0];
-        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
-        let result = tensor.softmax(0);
-        let expected_data = vec![0.09003057317038046, 0.24472847105479764];
+        {
+            let shape = vec![2, 3, 4, 5];
+            let data = (0u32..num_elements_from_shape(&shape) as u32).map(f64::from).collect::<Vec<f64>>();
 
-        todo!("Still need to determine the correct behaviour of the softmax function.");
-        assert_eq!(result.data, expected_data);
+            let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+            let dim_to_softmax = 1;
+            let result = tensor.softmax(dim_to_softmax);
+            
+            // Shape should be the unchanged
+            assert_eq!(result.shape(), shape.clone());
+
+            // All of the elements within the result should be within the range [0, 1]
+            for element in result.data.iter() {
+                assert!(*element >= 0.0 && *element <= 1.0);
+            }
+
+            // Calling dim_sum on the result of softmaxed should give a tensor with all 1s
+            let dim_sum_of_result = result.dim_sum(vec![dim_to_softmax]);
+
+            for element in dim_sum_of_result.data.iter() {
+                // The value should be close to 1, but not exactly 1 due to floating point errors
+                assert!((element - 1.0f64).abs() < 1e-10);
+            }
+        }
     }
 
     #[test]
