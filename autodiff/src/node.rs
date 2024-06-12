@@ -17,37 +17,36 @@ type Ptr<N> = Rc<RefCell<N>>;
 // TODO: Rename to NodeContent
 /// A node in a computation graph.
 #[derive(Debug)]
-pub enum Node<T> {
-    Sum(T, Option<T>, (NodePtr<T>, NodePtr<T>)),
-    Prod(T, Option<T>, (NodePtr<T>, NodePtr<T>)),
-    Exp(T, Option<T>, NodePtr<T>),
-    Ln(T, Option<T>, NodePtr<T>),
-    Pow(T, Option<T>, (NodePtr<T>, NodePtr<T>)),
+pub enum NodeContent<T> {
+    Sum(T, Option<T>, (Node<T>, Node<T>)),
+    Prod(T, Option<T>, (Node<T>, Node<T>)),
+    Exp(T, Option<T>, Node<T>),
+    Ln(T, Option<T>, Node<T>),
+    Pow(T, Option<T>, (Node<T>, Node<T>)),
     Leaf(T, Option<T>),
 }
 
-// TODO: Rename to Node.
 #[derive(Debug)]
-pub struct NodePtr<T> {
-    ptr: Ptr<Node<T>>,
+pub struct Node<T> {
+    ptr: Ptr<NodeContent<T>>,
 }
 
-// impl<T: RealElement + From<f64>> Deref for NodePtr<T> {
-//     type Target = Node<T>;
+// impl<T: RealElement + From<f64>> Deref for Node<T> {
+//     type Target = NodeContent<T>;
 
-//     fn deref(&self) -> &Node<T> {
+//     fn deref(&self) -> &NodeContent<T> {
 //         self.ptr.deref().borrow().deref()
 //     }
 // }
 
-impl<T: RealElement + From<f64>> NodePtr<T> {
-    pub fn new(node: Node<T>) -> Self {
-        NodePtr {
-            ptr: Rc::new(RefCell::new(node)),
+impl<T: RealElement + From<f64>> Node<T> {
+    pub fn new(val: T, grad: Option<T>) -> Self {
+        Node {
+            ptr: Rc::new(RefCell::new(NodeContent::new(val, grad))),
         }
     }
 
-    pub fn node(&self) -> Node<T> {
+    pub fn node(&self) -> NodeContent<T> {
         self.ptr.deref().borrow().deref().clone()
     }
 
@@ -85,79 +84,91 @@ impl<T: RealElement + From<f64>> NodePtr<T> {
         let self_val = self.val();
 
         match self.node() {
-            Node::Sum(_, _, (ref mut np1, ref mut np2)) => {
+            NodeContent::Sum(_, _, (ref mut np1, ref mut np2)) => {
                 np1.add_assign_grad(self_grad.clone());
                 np2.add_assign_grad(self_grad);
                 np1.propagate_backward();
                 np2.propagate_backward();
             }
-            Node::Prod(_, _, (ref mut np1, ref mut np2)) => {
+            NodeContent::Prod(_, _, (ref mut np1, ref mut np2)) => {
                 np1.add_assign_grad(np2.val().to_owned() * self_grad.clone());
                 np2.add_assign_grad(np1.val().to_owned() * self_grad);
                 np1.propagate_backward();
                 np2.propagate_backward();
             }
-            Node::Exp(_, _, ref mut np) => {
+            NodeContent::Exp(_, _, ref mut np) => {
                 np.add_assign_grad(self_grad * self_val);
                 np.propagate_backward();
             }
-            Node::Ln(_, _, ref mut np) => {
+            NodeContent::Ln(_, _, ref mut np) => {
                 np.add_assign_grad(self_grad * <f64 as Into<T>>::into(1_f64) / np.val());
                 np.propagate_backward();
             }
             // Node::Ln(_, _, ref mut n) => n.add_assign_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
-            Node::Pow(_, _, (ref mut np_b, ref mut np_e)) => {
+            NodeContent::Pow(_, _, (ref mut np_b, ref mut np_e)) => {
                 // exponent . base^(exponent - 1)
                 let b_val = np_b.val().clone();
                 let e_val = np_e.val().clone();
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
-                np_b.add_assign_grad(self_grad.clone() * e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one));
+                np_b.add_assign_grad(
+                    self_grad.clone()
+                        * e_val.clone()
+                        * b_val.clone().pow(e_val.clone() + minus_one),
+                );
 
                 // base^exponent . ln(base)
                 np_e.add_assign_grad(self_grad * b_val.clone().pow(e_val.to_owned()) * b_val.ln());
                 np_b.propagate_backward();
                 np_e.propagate_backward();
             }
-            Node::Leaf(_, _) => {} // Do nothing.
+            NodeContent::Leaf(_, _) => {} // Do nothing.
         }
     }
 }
 
-impl<T: RealElement + From<f64>> Node<T> {
+impl<T> From<NodeContent<T>> for Node<T> {
+    fn from(value: NodeContent<T>) -> Self {
+        Node {
+            ptr: Rc::new(RefCell::new(value)),
+        }
+    }
+}
+
+impl<T: RealElement + From<f64>> NodeContent<T> {
     pub fn new(val: T, grad: Option<T>) -> Self {
-        Node::Leaf(val, grad)
+        NodeContent::Leaf(val, grad)
     }
 
     pub fn val(&self) -> &T {
         match self {
-            Node::Sum(val, _, _)
-            | Node::Prod(val, _, _)
-            | Node::Exp(val, _, _)
-            | Node::Ln(val, _, _)
-            | Node::Pow(val, _, _)
-            | Node::Leaf(val, _) => val,
+            NodeContent::Sum(val, _, _)
+            | NodeContent::Prod(val, _, _)
+            | NodeContent::Exp(val, _, _)
+            | NodeContent::Ln(val, _, _)
+            | NodeContent::Pow(val, _, _)
+            | NodeContent::Leaf(val, _) => val,
         }
     }
 
     pub fn grad(&self) -> &Option<T> {
         match self {
-            Node::Sum(_, grad, _)
-            | Node::Prod(_, grad, _)
-            | Node::Exp(_, grad, _)
-            | Node::Ln(_, grad, _)
-            | Node::Pow(_, grad, _)
-            | Node::Leaf(_, grad) => grad,
+            NodeContent::Sum(_, grad, _)
+            | NodeContent::Prod(_, grad, _)
+            | NodeContent::Exp(_, grad, _)
+            | NodeContent::Ln(_, grad, _)
+            | NodeContent::Pow(_, grad, _)
+            | NodeContent::Leaf(_, grad) => grad,
         }
     }
 
     pub fn set_grad(&mut self, new_grad: T) {
         let g: &mut Option<T> = match self {
-            Node::Sum(_, grad, _)
-            | Node::Prod(_, grad, _)
-            | Node::Exp(_, grad, _)
-            | Node::Ln(_, grad, _)
-            | Node::Pow(_, grad, _)
-            | Node::Leaf(_, grad) => grad,
+            NodeContent::Sum(_, grad, _)
+            | NodeContent::Prod(_, grad, _)
+            | NodeContent::Exp(_, grad, _)
+            | NodeContent::Ln(_, grad, _)
+            | NodeContent::Pow(_, grad, _)
+            | NodeContent::Leaf(_, grad) => grad,
         };
 
         *g = Some(new_grad);
@@ -165,12 +176,12 @@ impl<T: RealElement + From<f64>> Node<T> {
 
     pub fn add_assign_grad(&mut self, new_grad: T) {
         let g: &mut Option<T> = match self {
-            Node::Sum(_, grad, _)
-            | Node::Prod(_, grad, _)
-            | Node::Exp(_, grad, _)
-            | Node::Ln(_, grad, _)
-            | Node::Pow(_, grad, _)
-            | Node::Leaf(_, grad) => grad,
+            NodeContent::Sum(_, grad, _)
+            | NodeContent::Prod(_, grad, _)
+            | NodeContent::Exp(_, grad, _)
+            | NodeContent::Ln(_, grad, _)
+            | NodeContent::Pow(_, grad, _)
+            | NodeContent::Leaf(_, grad) => grad,
         };
 
         match g {
@@ -180,108 +191,110 @@ impl<T: RealElement + From<f64>> Node<T> {
     }
 }
 
-impl<T: RealElement + From<f64>> Add<Node<T>> for Node<T> {
-    type Output = Node<T>;
+impl<T: RealElement + From<f64>> Add<NodeContent<T>> for NodeContent<T> {
+    type Output = NodeContent<T>;
 
-    fn add(self, rhs: Node<T>) -> Node<T> {
-        Node::Sum(
+    fn add(self, rhs: NodeContent<T>) -> NodeContent<T> {
+        NodeContent::Sum(
             self.val().clone() + rhs.val().clone(),
             None,
-            (NodePtr::new(self), NodePtr::new(rhs)),
+            (self.into(), rhs.into()),
         )
     }
 }
 
-impl<T: RealElement + From<f64>> Add<NodePtr<T>> for NodePtr<T> {
-    type Output = NodePtr<T>;
+impl<T: RealElement + From<f64>> Add<Node<T>> for Node<T> {
+    type Output = Node<T>;
 
-    fn add(self, rhs: NodePtr<T>) -> Self::Output {
-        NodePtr::new(Node::Sum(self.val() + rhs.val(), None, (self, rhs)))
+    fn add(self, rhs: Node<T>) -> Self::Output {
+        NodeContent::Sum(self.val() + rhs.val(), None, (self, rhs)).into()
+    }
+}
+
+impl<T: RealElement + From<f64>> Mul<NodeContent<T>> for NodeContent<T> {
+    type Output = NodeContent<T>;
+
+    fn mul(self, rhs: NodeContent<T>) -> NodeContent<T> {
+        NodeContent::Prod(
+            self.val().clone() * rhs.val().clone(),
+            None,
+            (self.into(), rhs.into()),
+        )
     }
 }
 
 impl<T: RealElement + From<f64>> Mul<Node<T>> for Node<T> {
     type Output = Node<T>;
 
-    fn mul(self, _rhs: Node<T>) -> Node<T> {
-        Node::Prod(
-            self.val().clone() * _rhs.val().clone(),
-            None,
-            (NodePtr::new(self), NodePtr::new(_rhs)),
-        )
+    fn mul(self, rhs: Node<T>) -> Self::Output {
+        NodeContent::Prod(self.val() * rhs.val(), None, (self, rhs)).into()
     }
 }
 
-impl<T: RealElement + From<f64>> Mul<NodePtr<T>> for NodePtr<T> {
-    type Output = NodePtr<T>;
+impl<T: RealElement + From<f64>> Div<NodeContent<T>> for NodeContent<T> {
+    type Output = NodeContent<T>;
 
-    fn mul(self, rhs: NodePtr<T>) -> Self::Output {
-        NodePtr::new(Node::Prod(self.val() * rhs.val(), None, (self, rhs)))
+    fn div(self, rhs: NodeContent<T>) -> NodeContent<T> {
+        // Same division by zero rules as standard division operator.
+        NodeContent::Prod(
+            self.val().clone() / rhs.val().clone(),
+            None,
+            (self.into(), rhs.into()),
+        )
     }
 }
 
 impl<T: RealElement + From<f64>> Div<Node<T>> for Node<T> {
     type Output = Node<T>;
 
-    fn div(self, _rhs: Node<T>) -> Node<T> {
-        // Same division by zero rules as standard division operator.
-        Node::Prod(
-            self.val().clone() / _rhs.val().clone(),
-            None,
-            (NodePtr::new(self), NodePtr::new(_rhs)),
-        )
+    fn div(self, rhs: Node<T>) -> Self::Output {
+        NodeContent::Prod(self.val() / rhs.val(), None, (self, rhs)).into()
     }
 }
 
-impl<T: RealElement + From<f64>> Div<NodePtr<T>> for NodePtr<T> {
-    type Output = NodePtr<T>;
-
-    fn div(self, rhs: NodePtr<T>) -> Self::Output {
-        NodePtr::new(Node::Prod(self.val() / rhs.val(), None, (self, rhs)))
+impl<T: RealElement + From<f64>> Exp for NodeContent<T> {
+    fn exp(self) -> Self {
+        NodeContent::Exp(self.val().clone().exp(), None, self.into())
     }
 }
 
 impl<T: RealElement + From<f64>> Exp for Node<T> {
     fn exp(self) -> Self {
-        Node::Exp(self.val().clone().exp(), None, NodePtr::new(self))
+        NodeContent::Exp(self.val().exp(), None, self).into()
     }
 }
 
-impl<T: RealElement + From<f64>> Exp for NodePtr<T> {
-    fn exp(self) -> Self {
-        NodePtr::new(Node::Exp(self.val().exp(), None, self))
+impl<T: RealElement + From<f64>> Ln for NodeContent<T> {
+    fn ln(self) -> Self {
+        NodeContent::Exp(self.val().clone().ln(), None, self.into())
     }
 }
 
 impl<T: RealElement + From<f64>> Ln for Node<T> {
     fn ln(self) -> Self {
-        Node::Exp(self.val().clone().ln(), None, NodePtr::new(self))
+        NodeContent::Ln(self.val().ln(), None, self).into()
     }
 }
 
-impl<T: RealElement + From<f64>> Ln for NodePtr<T> {
-    fn ln(self) -> Self {
-        NodePtr::new(Node::Ln(self.val().ln(), None, self))
+impl<T: RealElement + From<f64>> Pow for NodeContent<T> {
+    fn pow(self, exponent: NodeContent<T>) -> NodeContent<T> {
+        NodeContent::Pow(
+            self.val().clone().pow(exponent.val().clone()), // Note: unnecessary clone of exp.val() here?
+            None,
+            (self.into(), exponent.into()), // Base in position 1, exponent in position 2.
+        )
     }
 }
 
 impl<T: RealElement + From<f64>> Pow for Node<T> {
     fn pow(self, exponent: Node<T>) -> Node<T> {
-        Node::Pow(
-            self.val().clone().pow(exponent.val().clone()), // Note: unnecessary clone of exp.val() here?
-            None,
-            (NodePtr::new(self), NodePtr::new(exponent)), // Base in position 1, exponent in position 2.
-        )
+        NodeContent::Pow(self.val().pow(exponent.val()), None, (self, exponent)).into()
     }
 }
 
-impl<T: RealElement + From<f64>> Pow for NodePtr<T> {
-    fn pow(self, exponent: NodePtr<T>) -> NodePtr<T> {
-        NodePtr::new(Node::Pow(
-            self.val().pow(exponent.val()),
-            None,
-            (self, exponent),
-        ))
+impl<T: RealElement> AddAssign for NodeContent<T> {
+    fn add_assign(&mut self, _rhs: Self) {
+        panic!("Unexpected call to AddAssign on a Node.")
     }
 }
 
@@ -291,26 +304,20 @@ impl<T: RealElement> AddAssign for Node<T> {
     }
 }
 
-impl<T: RealElement> AddAssign for NodePtr<T> {
-    fn add_assign(&mut self, _rhs: Self) {
-        panic!("Unexpected call to AddAssign on a Node.")
-    }
-}
-
-impl<T: RealElement> Display for Node<T> {
+impl<T: RealElement> Display for NodeContent<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Node: {:?}", self)
     }
 }
 
-impl<T: RealElement> Display for NodePtr<T> {
+impl<T: RealElement> Display for Node<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Node: {:?}", self.ptr.deref().borrow())
     }
 }
 
 // TODO: check this (was auto-generated). Is it what we want?
-impl<T: RealElement> Clone for Node<T> {
+impl<T: RealElement> Clone for NodeContent<T> {
     fn clone(&self) -> Self {
         match self {
             Self::Sum(arg0, arg1, arg2) => Self::Sum(arg0.clone(), arg1.clone(), arg2.clone()),
@@ -323,7 +330,7 @@ impl<T: RealElement> Clone for Node<T> {
     }
 }
 
-impl<T: RealElement> Clone for NodePtr<T> {
+impl<T: RealElement> Clone for Node<T> {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr.clone(),
@@ -331,7 +338,7 @@ impl<T: RealElement> Clone for NodePtr<T> {
     }
 }
 
-impl<T: RealElement> PartialEq for Node<T> {
+impl<T: RealElement> PartialEq for NodeContent<T> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Sum(l0, l1, l2), Self::Sum(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
@@ -345,7 +352,7 @@ impl<T: RealElement> PartialEq for Node<T> {
     }
 }
 
-impl<T: RealElement> PartialEq for NodePtr<T> {
+impl<T: RealElement> PartialEq for Node<T> {
     fn eq(&self, other: &Self) -> bool {
         self.ptr == other.ptr
     }
@@ -357,21 +364,31 @@ impl<T: RealElement> PartialEq for NodePtr<T> {
 //     }
 // }
 
-impl<T: RealElement> From<f64> for Node<T> {
+impl<T: RealElement> From<f64> for NodeContent<T> {
     fn from(value: f64) -> Self {
-        Node::new(value.into(), None)
+        NodeContent::new(value.into(), None)
     }
 }
 
-impl<T: RealElement> From<f64> for NodePtr<T> {
+impl<T: RealElement> From<f64> for Node<T> {
     fn from(value: f64) -> Self {
-        NodePtr::new(Node::<T>::from(value))
+        NodeContent::<T>::from(value).into()
+    }
+}
+
+impl<T: RealElement> Zero for NodeContent<T> {
+    fn zero() -> Self {
+        NodeContent::new(0_f64.into(), None)
+    }
+
+    fn is_zero(&self) -> bool {
+        Self::zero().eq(self)
     }
 }
 
 impl<T: RealElement> Zero for Node<T> {
     fn zero() -> Self {
-        Node::new(0_f64.into(), None)
+        NodeContent::<T>::zero().into()
     }
 
     fn is_zero(&self) -> bool {
@@ -379,13 +396,11 @@ impl<T: RealElement> Zero for Node<T> {
     }
 }
 
-impl<T: RealElement> Zero for NodePtr<T> {
-    fn zero() -> Self {
-        NodePtr::new(Node::<T>::zero())
-    }
+impl<T: RealElement + From<f64>> Element for NodeContent<T> {}
 
-    fn is_zero(&self) -> bool {
-        Self::zero().eq(self)
+impl<T: RealElement + From<f64>> RealElement for NodeContent<T> {
+    fn neg_inf() -> Self {
+        NodeContent::new((-f64::INFINITY).into(), None)
     }
 }
 
@@ -393,15 +408,7 @@ impl<T: RealElement + From<f64>> Element for Node<T> {}
 
 impl<T: RealElement + From<f64>> RealElement for Node<T> {
     fn neg_inf() -> Self {
-        Node::new((-f64::INFINITY).into(), None)
-    }
-}
-
-impl<T: RealElement + From<f64>> Element for NodePtr<T> {}
-
-impl<T: RealElement + From<f64>> RealElement for NodePtr<T> {
-    fn neg_inf() -> Self {
-        NodePtr::new(Node::<T>::neg_inf())
+        NodeContent::<T>::neg_inf().into()
     }
 }
 
@@ -412,14 +419,14 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let node = Node::<f64>::new(3.1, Some(0.4));
+        let node = NodeContent::<f64>::new(3.1, Some(0.4));
         assert_eq!(node.val(), &3.1_f64);
         assert_eq!(node.grad(), &Some(0.4));
     }
 
     #[test]
     fn test_set_grad() {
-        let mut node = Node::<f64>::new(3.1, None);
+        let mut node = NodeContent::<f64>::new(3.1, None);
         assert_eq!(node.val(), &3.1_f64);
         assert_eq!(node.grad(), &None);
 
@@ -436,7 +443,7 @@ mod tests {
 
     #[test]
     fn test_set_grad_node_ptr() {
-        let mut node = NodePtr::new(Node::<f64>::new(3.1, None));
+        let mut node = Node::new(3.1, None);
         assert_eq!(node.val(), 3.1_f64);
         assert_eq!(node.grad(), None);
 
@@ -463,7 +470,7 @@ mod tests {
 
     #[test]
     fn test_add_assign_grad() {
-        let mut node = Node::<f64>::new(3.1, None);
+        let mut node = NodeContent::<f64>::new(3.1, None);
         assert_eq!(node.val(), &3.1_f64);
         assert_eq!(node.grad(), &None);
 
@@ -480,7 +487,7 @@ mod tests {
 
     #[test]
     fn test_add_assign_grad_node_ptr() {
-        let mut node = NodePtr::new(Node::<f64>::new(3.1, None));
+        let mut node = Node::new(3.1, None);
 
         assert_eq!(node.val(), 3.1_f64);
         assert_eq!(node.grad(), None);
@@ -498,8 +505,8 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
         let result = node1 + node2;
         assert_eq!(result.val(), &25.3_f64);
@@ -508,11 +515,11 @@ mod tests {
 
     #[test]
     fn test_add_node_ptr() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
-        let np1 = NodePtr::new(node1);
-        let np2 = NodePtr::new(node2);
+        let np1: Node<f64> = node1.into();
+        let np2 = node2.into();
 
         let result = np1 + np2;
         assert_eq!(result.val(), 25.3_f64);
@@ -521,8 +528,8 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
         let result = node1 * node2;
         assert_eq!(result.val(), &68.82_f64);
@@ -531,11 +538,11 @@ mod tests {
 
     #[test]
     fn test_mul_node_ptr() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
-        let np1 = NodePtr::new(node1);
-        let np2 = NodePtr::new(node2);
+        let np1: Node<f64> = node1.into();
+        let np2 = node2.into();
 
         let result = np1 * np2;
         assert_eq!(result.val(), 68.82_f64);
@@ -544,8 +551,8 @@ mod tests {
 
     #[test]
     fn test_div() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
         let result = node1 / node2;
         assert_eq!(result.val(), &0.13963963963963966_f64);
@@ -554,11 +561,11 @@ mod tests {
 
     #[test]
     fn test_div_node_ptr() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
-        let np1 = NodePtr::new(node1);
-        let np2 = NodePtr::new(node2);
+        let np1: Node<f64> = node1.into();
+        let np2 = node2.into();
 
         let result = np1 / np2;
         assert_eq!(result.val(), 0.13963963963963966_f64);
@@ -567,8 +574,8 @@ mod tests {
 
     #[test]
     fn test_div_by_zero() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(0.0, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(0.0, None);
 
         let result = node1 / node2;
         assert_eq!(result.val(), &f64::INFINITY);
@@ -576,8 +583,8 @@ mod tests {
 
     #[test]
     fn test_pow() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
         let result = node1.pow(node2);
         assert_eq!(result.val(), &80952376567.60643_f64);
@@ -586,11 +593,11 @@ mod tests {
 
     #[test]
     fn test_pow_node_ptr() {
-        let node1 = Node::<f64>::new(3.1, Some(0.4));
-        let node2 = Node::<f64>::new(22.2, None);
+        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
+        let node2 = NodeContent::<f64>::new(22.2, None);
 
-        let np1 = NodePtr::new(node1);
-        let np2 = NodePtr::new(node2);
+        let np1: Node<f64> = node1.into();
+        let np2 = node2.into();
 
         let result = np1.pow(np2);
         assert_eq!(result.val(), 80952376567.60643_f64);
@@ -604,8 +611,8 @@ mod tests {
 
     #[test]
     fn test_backward_on_sum() {
-        let node1 = NodePtr::new(Node::new(1.1, None));
-        let node2 = NodePtr::new(Node::new(2.2, None));
+        let node1 = Node::new(1.1, None);
+        let node2 = Node::new(2.2, None);
 
         let node = node1.clone() + node2.clone();
 
@@ -626,8 +633,8 @@ mod tests {
 
     #[test]
     fn test_backward_on_prod() {
-        let node1 = NodePtr::new(Node::new(1.1, None));
-        let node2 = NodePtr::new(Node::new(2.2, None));
+        let node1 = Node::new(1.1, None);
+        let node2 = Node::new(2.2, None);
 
         let node = node1.clone() * node2.clone();
 
@@ -648,9 +655,9 @@ mod tests {
 
     #[test]
     fn test_backward_on_prod_sum() {
-        let node_a = NodePtr::new(Node::new(3.0, None));
-        let node_b = NodePtr::new(Node::new(2.0, None));
-        let node_c = NodePtr::new(Node::new(2.0, None));
+        let node_a = Node::new(3.0, None);
+        let node_b = Node::new(2.0, None);
+        let node_c = Node::new(2.0, None);
 
         let node_d = node_a.clone() + node_b.clone();
         let node_f = node_d.clone() * node_c.clone();
@@ -683,11 +690,11 @@ mod tests {
     fn test_backward_on_2x_squared_plus_exp_5x() {
         // Expression: f(x) = 2x^2 + exp(5x)
 
-        let node_x = NodePtr::new(Node::new(3.0, None));
+        let node_x = Node::new(3.0, None);
 
-        let node_2 = NodePtr::new(Node::new(2.0, None));
-        let node_2_ = NodePtr::new(Node::new(2.0, None));
-        let node_5 = NodePtr::new(Node::new(5.0, None));
+        let node_2 = Node::new(2.0, None);
+        let node_2_ = Node::new(2.0, None);
+        let node_5 = Node::new(5.0, None);
 
         let node_5x = node_5.clone() * node_x.clone();
         let node_exp_5x = node_5x.clone().exp();
@@ -736,16 +743,15 @@ mod tests {
         //    )/x
         //   )
         // ) - 3.14 = x
-        let node_x = NodePtr::new(Node::new(3.0, None));
-        let node_314 = NodePtr::new(Node::new(3.14, None));
+        let node_x = Node::new(3.0, None);
+        let node_314 = Node::new(3.14, None);
         let node_1 = node_x.clone() + node_314.clone();
         let node_1 = node_1.clone().ln();
-        let node_1 = node_1.clone() * node_x.clone().pow(NodePtr::from(-1.0));
+        let node_1 = node_1.clone() * node_x.clone().pow(Node::from(-1.0));
         let node_1 = node_1.clone() * node_x.clone();
         let node_1 = node_1.clone().exp();
-        let node_1 = node_1.clone() + (NodePtr::from(-1.0) * node_314.clone());
+        let node_1 = node_1.clone() + (Node::from(-1.0) * node_314.clone());
         let node_1 = node_1.backward(1.0);
         assert!(f64::abs(node_x.grad().unwrap() - 1.0_f64) < 1e-10);
     }
-
 }
