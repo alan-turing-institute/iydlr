@@ -408,21 +408,8 @@ where
                     let idx = lead_idx * self.shape[dim] * trailing_dims
                         + summing_idx * trailing_dims
                         + trail_idx;
-                    // let idx = summing_idx + lead_idx + (trail_idx * leading_dims);
-
-                    // sum += original[lead_idx,summing_idx,trail_idx]
                     sum += self.data[idx].clone();
                 }
-                // for (j, value) in self.data.iter().enumerate() {
-                //     // print value of i, j and value
-                //     let a = j % leading_dims;
-                //     let b = j % trailing_dims;
-
-                //     if j % self.shape[dim] == trail_idx {
-                //         sum += value.clone();
-                //     }
-                //     println!("i: {}, j: {}, a: {}, b: {}, value: {}, sum: {}", trail_idx, j, a, b, value, sum);
-                // }
                 dim_sum.push(sum);
             }
         }
@@ -467,6 +454,9 @@ impl<E: RealElement> Ln for TensorImpl<E> {
 impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
         todo!()
+        let data_exp = self.exp();
+        let data_sum = data_exp.dim_sum(vec![dim]);
+
     }
 
     fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
