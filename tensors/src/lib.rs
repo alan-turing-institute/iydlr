@@ -318,11 +318,6 @@ where
                 "Tensors must have the same number of dimensions",
             ));
         }
-        if dim != self.num_dims() - 1 {
-            return Err(Error::msg(
-                "Concatenation is only supported along the last dimension",
-            ));
-        }
         for i in 0..self.shape.len() {
             if i != dim && self.shape[i] != other.shape[i] {
                 return Err(Error::msg(
@@ -331,14 +326,24 @@ where
             }
         }
 
-        let self_last_dim = *self.shape.last().unwrap();
-        let other_last_dim = *other.shape.last().unwrap();
+        let n_dims = self.num_dims();
+        let self_chunk_dim = self
+            .shape
+            .iter()
+            .rev()
+            .take(n_dims - dim)
+            .product::<usize>();
+        let other_chunk_dim = other
+            .shape
+            .iter()
+            .rev()
+            .take(n_dims - dim)
+            .product::<usize>();
 
-        // Interleave the two flattened tensors in chunks equal to size of last dim of respective tensors
         let new_data: Vec<E> = self
             .data
-            .chunks(self_last_dim)
-            .zip(other.data.chunks(other_last_dim)) // yields items like (&[1.0, 2.0, 3.0], &[7.0, 8.0, 9.0])
+            .chunks(self_chunk_dim)
+            .zip(other.data.chunks(other_chunk_dim)) // yields items like (&[1.0, 2.0, 3.0], &[7.0, 8.0, 9.0])
             .flat_map(|(a, b)| a.into_iter().chain(b)) // chains to produce iterators like [1.0, 2.0, 3.0, 7.0, 8.0, 9.0]
             // TODO: consider adding a bound on copy
             // .copied()
@@ -788,53 +793,174 @@ mod tests {
     }
 
     #[test]
-    fn test_concat_shape() {
+    fn test_concat() {
         let mut rng = rand::thread_rng();
 
-        let shape1 = vec![5, 4, 3, 2];
-        let num_elements1 = num_elements_from_shape(&shape1);
-        let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+        {
+            // Concat over last dim
+            let shape1 = vec![5, 4, 3, 2];
+            let num_elements1 = num_elements_from_shape(&shape1);
+            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
 
-        let shape2 = vec![5, 4, 3, 3];
-        let num_elements2 = num_elements_from_shape(&shape2);
-        let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+            let shape2 = vec![5, 4, 3, 3];
+            let num_elements2 = num_elements_from_shape(&shape2);
+            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
 
-        let result = tensor1.concat(&tensor2, 3).unwrap();
-        let shape_expected = vec![5, 4, 3, 5];
-        assert_eq!(result.shape, shape_expected);
+            let result = tensor1.concat(&tensor2, 3).unwrap();
+            let shape_expected = vec![5, 4, 3, 5];
+            assert_eq!(result.shape, shape_expected);
+            // Check that the result has the same elements as the original, just in a different order.
+            let mut sorted_expected = data1.clone();
+            sorted_expected.extend(data2.clone());
+            sorted_expected.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let mut sorted_elements = result.data.clone();
+            sorted_elements.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            assert_eq!(sorted_elements, sorted_expected);
+        }
+
+        {
+            // Concat over first dim
+            let shape1 = vec![5, 4, 3, 2];
+            let num_elements1 = num_elements_from_shape(&shape1);
+            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![4, 4, 3, 2];
+            let num_elements2 = num_elements_from_shape(&shape2);
+            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let result = tensor1.concat(&tensor2, 0).unwrap();
+            let shape_expected = vec![9, 4, 3, 2];
+            assert_eq!(result.shape, shape_expected);
+            // Check that the result has the same elements as the original, just in a different order.
+            let mut sorted_expected = data1.clone();
+            sorted_expected.extend(data2.clone());
+            sorted_expected.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let mut sorted_elements = result.data.clone();
+            sorted_elements.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            assert_eq!(sorted_elements, sorted_expected);
+        }
+
+        {
+            // Concat over middle dim
+            let shape1 = vec![5, 4, 2, 2];
+            let num_elements1 = num_elements_from_shape(&shape1);
+            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![5, 4, 3, 2];
+            let num_elements2 = num_elements_from_shape(&shape2);
+            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let result = tensor1.concat(&tensor2, 2).unwrap();
+            let shape_expected = vec![5, 4, 5, 2];
+            assert_eq!(result.shape, shape_expected);
+            // Check that the result has the same elements as the original, just in a different order.
+            let mut sorted_expected = data1.clone();
+            sorted_expected.extend(data2.clone());
+            sorted_expected.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let mut sorted_elements = result.data.clone();
+            sorted_elements.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            assert_eq!(sorted_elements, sorted_expected);
+        }
     }
 
     #[test]
-    /// Test that concat(A * B, A * C, 2) == A * concat(B, C, 2).
+    /// Test that concat(A * B, A * C, 2) == A * concat(B, C, 2) and
+    /// concat(B * A, C * A, 2) == concat(B, C, 2) * A.
     fn test_concat_matmul() {
         let mut rng = rand::thread_rng();
 
-        let shape1 = vec![3, 2];
-        let num_elements1 = num_elements_from_shape(&shape1);
-        let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
-        let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+        {
+            let shape1 = vec![3, 2];
+            let num_elements1 = num_elements_from_shape(&shape1);
+            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
 
-        let shape2 = vec![3, 4];
-        let num_elements2 = num_elements_from_shape(&shape2);
-        let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
-        let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+            let shape2 = vec![3, 4];
+            let num_elements2 = num_elements_from_shape(&shape2);
+            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
 
-        let shape3 = vec![3, 3];
-        let num_elements3 = num_elements_from_shape(&shape3);
-        let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
-        let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
+            let shape3 = vec![3, 3];
+            let num_elements3 = num_elements_from_shape(&shape3);
+            let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
+            let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
 
-        let result1 = tensor3
-            .matmul(&tensor1.concat(&tensor2, 1).unwrap())
-            .unwrap();
-        let result2 = tensor3
-            .matmul(&tensor1)
-            .unwrap()
-            .concat(&tensor3.matmul(&tensor2).unwrap(), 1)
-            .unwrap();
-        assert_eq!(result1.shape, result2.shape);
-        assert_eq!(result1.data, result2.data);
+            let result1 = tensor3
+                .matmul(&tensor1.concat(&tensor2, 1).unwrap())
+                .unwrap();
+            let result2 = tensor3
+                .matmul(&tensor1)
+                .unwrap()
+                .concat(&tensor3.matmul(&tensor2).unwrap(), 1)
+                .unwrap();
+            assert_eq!(result1.shape, result2.shape);
+            assert_eq!(result1.data, result2.data);
+        }
+
+        {
+            let shape1 = vec![3, 2];
+            let num_elements1 = num_elements_from_shape(&shape1);
+            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![4, 2];
+            let num_elements2 = num_elements_from_shape(&shape2);
+            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let shape3 = vec![2, 2];
+            let num_elements3 = num_elements_from_shape(&shape3);
+            let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
+            let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
+
+            let result1 = &tensor1
+                .concat(&tensor2, 0)
+                .unwrap()
+                .matmul(&tensor3)
+                .unwrap();
+            let result2 = tensor1
+                .matmul(&tensor3)
+                .unwrap()
+                .concat(&tensor2.matmul(&tensor3).unwrap(), 0)
+                .unwrap();
+            assert_eq!(result1.shape, result2.shape);
+            assert_eq!(result1.data, result2.data);
+        }
+
+        {
+            let shape1 = vec![2, 3, 2];
+            let num_elements1 = num_elements_from_shape(&shape1);
+            let data1: Vec<f64> = (0..num_elements1).map(|_| rng.gen::<f64>()).collect();
+            let tensor1 = TensorImpl::from_vec(&shape1, &data1).unwrap();
+
+            let shape2 = vec![4, 3, 2];
+            let num_elements2 = num_elements_from_shape(&shape2);
+            let data2: Vec<f64> = (0..num_elements2).map(|_| rng.gen::<f64>()).collect();
+            let tensor2 = TensorImpl::from_vec(&shape2, &data2).unwrap();
+
+            let shape3 = vec![2, 2];
+            let num_elements3 = num_elements_from_shape(&shape3);
+            let data3: Vec<f64> = (0..num_elements3).map(|_| rng.gen::<f64>()).collect();
+            let tensor3 = TensorImpl::from_vec(&shape3, &data3).unwrap();
+
+            let result1 = &tensor1
+                .concat(&tensor2, 0)
+                .unwrap()
+                .matmul(&tensor3)
+                .unwrap();
+            let result2 = tensor1
+                .matmul(&tensor3)
+                .unwrap()
+                .concat(&tensor2.matmul(&tensor3).unwrap(), 0)
+                .unwrap();
+            assert_eq!(result1.shape, result2.shape);
+            assert_eq!(result1.data, result2.data);
+        }
     }
 }
