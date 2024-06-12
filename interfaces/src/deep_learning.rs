@@ -1,8 +1,6 @@
 use crate::tensors::{Element, Tensor};
 use std::fmt::Debug;
 
-
-
 /// Deep Learning Module, generic over a Tensor object T and it's elements E.
 pub trait DLModule<T, E>
 where
