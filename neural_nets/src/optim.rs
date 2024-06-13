@@ -67,9 +67,9 @@ where
     T: RealTensor<E>,
     E: RealElement + From<f64>,
 {
-    let t_small = T::fill_with_clone(y_pred.shape(), E::from(0.00000001));
+    let t_small = E::from(0.00000001);
     let result = (y.clone() * (y_pred.clone() + t_small).ln()).dim_sum(vec![2]);
-    let t_negative_ones = T::fill_with_clone(result.shape(), E::from(-1.0));
+    let t_negative_ones = E::from(-1.0);
     result * t_negative_ones
 }
 
