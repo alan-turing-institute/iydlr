@@ -47,6 +47,7 @@ impl OptimSGD<Node<f64>> {
 //             + (E::from(1.0) - y) * (E::from(1.0) - (y_pred - E::from(0.0000001))).ln())
 // }
 
+/// Binary cross entropy loss function.
 pub fn bce<T, E>(y: T, y_pred: T) -> T
 where
     T: RealTensor<E>,
@@ -61,12 +62,55 @@ where
 }
 
 /// Categorical (i.e. multi-label) cross entropy loss function.
-pub fn cce<T, E>(y: T, y_pred: T) -> T
+pub fn cce<T, E>(y: &T, y_pred: &T) -> T
 where
     T: RealTensor<E>,
     E: RealElement + From<f64>,
 {
-    let y_shape = y.shape();
-    let t_ones = T::fill_with_clone(vec![y_shape[0], 1, y_shape[2]], E::from(1.0));
-    (y * y_pred.ln()).matmul(&t_ones.transpose()).unwrap() // TODO: minus 1 *
+    let t_small = T::fill_with_clone(y_pred.shape(), E::from(0.000000001));
+    (y.clone() * (y_pred.clone() + t_small))
+        .ln()
+        .dim_sum(vec![2]) // TODO: minus 1 *
+}
+
+#[cfg(test)]
+mod tests {
+    use interfaces::tensors::Tensor;
+    use tensors::TensorImpl;
+
+    use super::*;
+
+    #[test]
+    fn test_cce() {
+        let y_pred = (0..(2 * 2 * 2))
+            .into_iter()
+            .map(|x| 1_f64 / x as f64)
+            .collect::<Vec<f64>>();
+        let y = (0..(2 * 2 * 2))
+            .into_iter()
+            .map(|_| 0 as f64)
+            .collect::<Vec<f64>>();
+
+        let shape = vec![2, 2, 2];
+        let y_pred = TensorImpl::from_vec(&shape, &y_pred).unwrap();
+        let mut y = TensorImpl::from_vec(&shape, &y).unwrap();
+
+        // batch 0.
+        let e = y.at_mut(vec![0, 0, 1]).unwrap();
+        *e = 1_f64;
+        let e = y.at_mut(vec![0, 1, 0]).unwrap();
+        *e = 1_f64;
+
+        // batch 1.
+        let e = y.at_mut(vec![1, 0, 1]).unwrap();
+        *e = 1_f64;
+        let e = y.at_mut(vec![1, 1, 0]).unwrap();
+        *e = 1_f64;
+
+        let loss = cce(&y, &y_pred);
+        println!("{:?}", loss);
+
+        let bce_loss = bce(y, y_pred);
+        println!("{:?}", bce_loss);
+    }
 }
