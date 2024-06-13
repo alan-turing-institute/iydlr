@@ -1,18 +1,17 @@
-use interfaces::{deep_learning::DLModule, tensors::{Element, RealElement, RealTensor, Tensor}};
-// use interfaces::tensors::TensorImpl;
-use tensors::TensorImpl;
+use interfaces::{
+    deep_learning::DLModule,
+    tensors::{Element, RealElement, Tensor},
+};
 use std::marker::PhantomData;
 
+// PELayer implementing DLModule.
 
-// Create PE layer with implements DLModule
-
-pub struct PELayer<T: Tensor<E>, E: Element>{
+pub struct PELayer<T: Tensor<E>, E: Element> {
     tensor_phantom: PhantomData<T>,
     tensor_element_phantom: PhantomData<E>,
 }
 
-
-impl<T, E> DLModule<T, E> for PELayer<T, E> 
+impl<T, E> DLModule<T, E> for PELayer<T, E>
 where
     T: Tensor<E>,
     E: RealElement + Into<f64>,
@@ -24,18 +23,15 @@ where
         let seq_len = input_shape[1];
         let d = input_shape[2];
         let pe: T = PELayer::pos_encoding(seq_len, d, 10000);
-        
+
         Ok(x.clone().add(pe))
     }
-    
 
     // This should return a empty vector
     fn params(&self) -> Vec<E> {
         Vec::<E>::new()
     }
-    
 }
-
 
 impl<T, E> PELayer<T, E>
 where
@@ -49,12 +45,12 @@ where
         if d < 4 {
             panic!("d must be greater or equal to 4");
         }
-    
+
         let mut accumulator = Vec::<E>::with_capacity(d * d);
-    
+
         let d_f64 = d as f64;
         let n = n as f64;
-    
+
         // each row
         for k in 0..seq_len {
             //each pair of columns
@@ -65,30 +61,23 @@ where
                 accumulator.push((k / n.powf(2.0 * i / d_f64)).cos().into());
             }
         }
-    
+
         // Using PyTorch's behaviour as a reference
         let shape = vec![1, seq_len, d];
-
         T::from_vec(&shape, &accumulator).unwrap()
-        // PELayer {
-        //     x: T::from_vec(&shape, &accumulator).unwrap(),
-        //     tensor_element_phantom: PhantomData
-        // }
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    use tensors::TensorImpl;
 
     #[test]
     fn test_pos_encoding() {
         let result: TensorImpl<f64> = PELayer::pos_encoding(4, 4, 100);
-        // check that it returns a tensor of size 4x4
+        // check that it returns a tensor of size 1x4x4
         assert_eq!(result.shape(), vec![1, 4, 4]);
 
         let compare = [
@@ -115,13 +104,15 @@ mod tests {
     #[test]
     fn test_forward() {
         let original_data = (0..32).into_iter().map(|x| x as f64).collect::<Vec<f64>>();
-        let target = PELayer{ tensor_phantom: PhantomData, tensor_element_phantom: PhantomData };
+        let target = PELayer {
+            tensor_phantom: PhantomData,
+            tensor_element_phantom: PhantomData,
+        };
         let x = TensorImpl::from_vec(&vec![2, 4, 4], &original_data).unwrap();
-   
+
         let result = target.forward(&x).unwrap();
 
         assert_eq!(result.shape(), vec![2, 4, 4]);
-
         assert_eq!(result.at(vec![0, 1, 0]).unwrap(), &4.8414709848078965_f64);
     }
 }
