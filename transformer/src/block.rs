@@ -26,7 +26,7 @@ use std::marker::PhantomData;
 ///   - T is time
 ///   - C is channel.
 /// Example from the keras API ([encoder](https://keras.io/api/keras_nlp/modeling_layers/transformer_encoder/))
-struct Block<L, A, T, E, Al>
+pub struct Block<L, A, T, E, Al>
 where
     L: LinearLayer<T, E>,
     A: SelfAttention<T, E>,
@@ -93,7 +93,7 @@ where
 // TODO: once activation is concrete
 // Block<L, A, T, E, Al>
 impl Block<La, Mal, Te, El, ActLayer<Te, El>> {
-    fn new(config: &Config, is_masked: bool) -> Self {
+    pub fn new(config: &Config, is_masked: bool) -> Self {
         let self_attention = MultiHeadAttention::new(config, is_masked);
         // Residual connection: add embedding matrix X to the output of the sub-layer element-wise
         let linear_layer1 = LinLayer::new(config.embed_dim, 4 * config.embed_dim, config.seed);
