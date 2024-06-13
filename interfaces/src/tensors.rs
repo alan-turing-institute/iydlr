@@ -56,6 +56,8 @@ where
     fn dim_sum(&self, dims: Vec<usize>) -> Self;
 
     fn concat(&self, other: &Self, dim: usize) -> Result<Self, Self::TensorError>;
+
+    fn reshape(&mut self, new_shape: Vec<usize>);
 }
 
 /// Collection of traits required by the elements of a Tensor.
