@@ -7,7 +7,7 @@ use rand_chacha::ChaCha8Rng;
 use statrs::distribution::Normal;
 use std::marker::PhantomData;
 
-struct EmbeddingTable<T: Tensor<E>, E: Element> {
+pub struct EmbeddingTable<T: Tensor<E>, E: Element> {
     table: T,
     vocab_size: usize,
     tensor_element_phantom: PhantomData<E>,
@@ -60,7 +60,7 @@ where
     T: Tensor<E>,
     E: Element + From<f64>,
 {
-    fn new(n_emb: usize, vocab_size: usize, seed: u64) -> Self {
+    pub fn new(n_emb: usize, vocab_size: usize, seed: u64) -> Self {
         // He weight initialisation
         // https://machinelearningmastery.com/weight-initialization-for-deep-learning-neural-networks/
         let noise_mean = 0.0;

@@ -50,15 +50,6 @@ impl<E: Element> TensorImpl<E> {
             .fold(0, |acc, (idx, stride)| acc + idx * stride);
     }
 
-    // TODO(mhauru) This should return something like a view, which references the same data but is
-    // a new object. I don't know how to do that though.
-    //fn reshape(&mut self, new_shape: Vec<usize>) {
-    //    if self.num_elements() != num_elements_from_shape(&new_shape) {
-    //        panic!("The number of elements in the new shape does not match the number of elements in the original shape.");
-    //    }
-    //    self.shape = new_shape;
-    //}
-
     /// Multiply the tensor by the transpose of a matrix.
     ///
     /// This is equivalent to `self.matmul(other.transpose())`, but faster.
@@ -115,7 +106,12 @@ impl<E: Element> TensorImpl<E> {
                             + j_inner * self_strides[self_num_dims - 1];
                         let other_idx = j2 * other_strides[other_num_dims - 2]
                             + j_inner * other_strides[other_num_dims - 1];
-                        accumulator += self.data[self_idx].clone() * other.data[other_idx].clone();
+
+                        // TODO: since AddAssign is not impl for Node currently, just use Add.
+                        // Revert this once AddAssign is implemented.
+                        // accumulator += self.data[self_idx].clone() * other.data[other_idx].clone();
+                        accumulator = accumulator
+                            + self.data[self_idx].clone() * other.data[other_idx].clone();
                     }
                     new_data.push(accumulator);
                 }
@@ -127,7 +123,8 @@ impl<E: Element> TensorImpl<E> {
         });
     }
 
-    fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
+
+    pub fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
         if self.shape() == other.shape() {
             return self.elementwise_binary_op_same_shape(other, op);
         } else {
@@ -310,7 +307,7 @@ impl<E: Element> Div<E> for TensorImpl<E> {
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
-    E: Element
+    E: Element,
 {
     type TensorError = AsStdError;
 
@@ -456,6 +453,20 @@ where
         }
         return result;
     }
+
+    // TODO(mhauru) This should return something like a view, which references the same data but is
+    // a new object. I don't know how to do that though.
+    fn reshape(&mut self, new_shape: Vec<usize>) {
+        let num_els = self.num_elements();
+        let new_num_els = num_elements_from_shape(&new_shape);
+        // println!("Num els {}", num_els);
+        // println!("New num els{}", new_num_els);
+        // println!("Shape: {:?}", self.shape());
+        if self.num_elements() != num_elements_from_shape(&new_shape) {
+            panic!("The number of elements in the new shape does not match the number of elements in the original shape.");
+        }
+        self.shape = new_shape;
+    }
 }
 
 impl<E> TensorImpl<E>
@@ -546,7 +557,8 @@ where
                     let idx = lead_idx * self.shape[dim] * trailing_dims
                         + summing_idx * trailing_dims
                         + trail_idx;
-                    sum += self.data[idx].clone();
+                    // sum += self.data[idx].clone();
+                    sum = sum + self.data[idx].clone();
                 }
                 dim_sum.push(sum);
             }
@@ -1133,12 +1145,14 @@ mod tests {
     fn test_softmax() {
         {
             let shape = vec![2, 3, 4, 5];
-            let data = (0u32..num_elements_from_shape(&shape) as u32).map(f64::from).collect::<Vec<f64>>();
+            let data = (0u32..num_elements_from_shape(&shape) as u32)
+                .map(f64::from)
+                .collect::<Vec<f64>>();
 
             let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
             let dim_to_softmax = 1;
             let result = tensor.softmax(dim_to_softmax);
-            
+
             // Shape should be the unchanged
             assert_eq!(result.shape(), shape.clone());
 
