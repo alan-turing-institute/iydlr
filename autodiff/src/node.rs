@@ -62,67 +62,68 @@ impl<T: RealElement + From<f64>> Node<T> {
 
     // Set the gradient and initiate backward propagation.
     pub fn backward(mut self, gradient: T) -> Self {
-        self.add_assign_grad(gradient);
-        self.propagate_backward();
+        self.add_assign_grad(gradient.clone());
+        self.propagate_backward(gradient);
         self
     }
 
     // Propagate a given gradient on the `grad` of each associated Node.
     // Assumes the `grad` on self is not None.
-    pub fn propagate_backward(&mut self) {
-        // Unwrap safe because self.grad should have been assigned Some before descending:
-        let self_grad = self.grad().unwrap();
+    pub fn propagate_backward(&mut self, grad: T) {
         let self_val = self.val();
 
         // let node_content_ref = self.ptr.as_ref().borrow().deref();
         match self.ptr.as_ref().borrow_mut().deref_mut() {
             NodeContent::Sum(_, _, (ref mut np1, ref mut np2)) => {
-                np1.add_assign_grad(self_grad.clone());
-                np2.add_assign_grad(self_grad);
-                np1.propagate_backward();
-                np2.propagate_backward();
+                np1.add_assign_grad(grad.clone());
+                np2.add_assign_grad(grad.clone());
+                np1.propagate_backward(grad.clone());
+                np2.propagate_backward(grad);
             }
             NodeContent::Prod(_, _, (ref mut np1, ref mut np2)) => {
-                np1.add_assign_grad(np2.val().to_owned() * self_grad.clone());
-                np2.add_assign_grad(np1.val().to_owned() * self_grad);
-                np1.propagate_backward();
-                np2.propagate_backward();
+                let np1_grad = np2.val().to_owned() * grad.clone();
+                let np2_grad = np1.val().to_owned() * grad.clone();
+                np1.add_assign_grad(np1_grad.clone());
+                np2.add_assign_grad(np2_grad.clone());
+                np1.propagate_backward(np1_grad);
+                np2.propagate_backward(np2_grad);
             }
             NodeContent::Quot(_, _, (ref mut np_num, ref mut np_denom)) => {
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
                 let two = <f64 as Into<T>>::into(2_f64);
-                np_num.add_assign_grad(self_grad.clone() / np_denom.val().to_owned());
-                np_denom.add_assign_grad(
-                    minus_one * self_grad * np_num.val().to_owned()
-                        / np_denom.val().to_owned().pow(two),
-                );
-                np_num.propagate_backward();
-                np_denom.propagate_backward();
+                let np_num_grad = grad.clone() / np_denom.val().to_owned();
+                let np_denom_grad =
+                    minus_one * grad * np_num.val().to_owned() / np_denom.val().to_owned().pow(two);
+                np_num.add_assign_grad(np_num_grad.clone());
+                np_denom.add_assign_grad(np_denom_grad.clone());
+                np_num.propagate_backward(np_num_grad);
+                np_denom.propagate_backward(np_denom_grad);
             }
             NodeContent::Exp(_, _, ref mut np) => {
-                np.add_assign_grad(self_grad * self_val);
-                np.propagate_backward();
+                let np_grad = grad * self_val;
+                np.add_assign_grad(np_grad.clone());
+                np.propagate_backward(np_grad);
             }
             NodeContent::Ln(_, _, ref mut np) => {
-                np.add_assign_grad(self_grad * <f64 as Into<T>>::into(1_f64) / np.val());
-                np.propagate_backward();
+                let np_grad = grad * <f64 as Into<T>>::into(1_f64) / np.val();
+                np.add_assign_grad(np_grad.clone());
+                np.propagate_backward(np_grad);
             }
-            // Node::Ln(_, _, ref mut n) => n.add_assign_grad(self_val.pow(<f64 as Into<T>>::into(-1_f64))),
             NodeContent::Pow(_, _, (ref mut np_b, ref mut np_e)) => {
                 // exponent . base^(exponent - 1)
                 let b_val = np_b.val().clone();
                 let e_val = np_e.val().clone();
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
-                np_b.add_assign_grad(
-                    self_grad.clone()
-                        * e_val.clone()
-                        * b_val.clone().pow(e_val.clone() + minus_one),
-                );
+
+                let np_b_grad =
+                    grad.clone() * e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one);
+                let np_e_grad = grad * b_val.clone().pow(e_val.to_owned()) * b_val.ln();
+                np_b.add_assign_grad(np_b_grad.clone());
 
                 // base^exponent . ln(base)
-                np_e.add_assign_grad(self_grad * b_val.clone().pow(e_val.to_owned()) * b_val.ln());
-                np_b.propagate_backward();
-                np_e.propagate_backward();
+                np_e.add_assign_grad(np_e_grad.clone());
+                np_b.propagate_backward(np_b_grad);
+                np_e.propagate_backward(np_e_grad);
             }
             NodeContent::Leaf(_, _) => {} // Do nothing.
         }
