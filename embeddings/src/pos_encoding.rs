@@ -30,7 +30,8 @@ pub fn pos_encoding(seq_len: usize, d: usize, n: usize) -> TensorImpl<f64> {
 
     println!("{:?}", accumulator);
 
-    let shape = vec![d, d];
+    // Using PyTorch's behaviour as a reference
+    let shape = vec![seq_len, 1, d];
     TensorImpl::from_vec(&shape, &accumulator).unwrap()
 }
 
