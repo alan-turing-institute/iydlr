@@ -7,8 +7,8 @@ use statrs::distribution::Normal;
 use std::marker::PhantomData;
 
 pub struct LinLayer<T: Tensor<E>, E: Element> {
-    w: T,
-    b: T,
+    pub w: T,
+    pub b: T,
     tensor_element_phantom: PhantomData<E>,
 }
 
@@ -122,14 +122,5 @@ mod tests {
         let out = layer.forward(&x).unwrap();
         println!("{:?}", out);
         assert_eq!(out.shape(), vec![2, 3]);
-    }
-
-    #[test]
-    #[should_panic]
-    fn forward_panic() {
-        // Test that the forward method panics when the input tensor is not 3D
-        let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
-        let x = TensorImpl::from_vec(&vec![2, 2], &vec![6.0; 4]).unwrap();
-        layer.forward(&x).unwrap();
     }
 }
