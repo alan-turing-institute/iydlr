@@ -1,6 +1,7 @@
 use num_traits::Zero;
 
 use autodiff::node::Node;
+use config::Config;
 use interfaces::deep_learning::{DLModule, LinearLayer};
 use interfaces::tensors::{RealElement, RealTensor, Tensor};
 use neural_nets::lin_layer::LinLayer;
@@ -43,15 +44,6 @@ where
 type El = Node<f64>;
 type Te = TensorImpl<El>;
 type La = LinLayer<Te, El>;
-
-#[derive(Debug)]
-struct Config {
-    batch_size: usize,
-    vocab_size: usize,
-    seq_len: usize,
-    embed_dim: usize,
-    num_head: usize,
-}
 
 impl MultiHeadAttention<Te, El, La> {
     fn new(config: &Config, is_masked: bool) -> Self {
@@ -199,7 +191,12 @@ where
     }
 
     fn params(&self) -> Vec<E> {
-        todo!()
+        self.query_weights
+            .iter()
+            .flat_map(|layer| layer.params())
+            .chain(self.key_weights.iter().flat_map(|layer| layer.params()))
+            .chain(self.value_weights.iter().flat_map(|layer| layer.params()))
+            .collect()
     }
 }
 
