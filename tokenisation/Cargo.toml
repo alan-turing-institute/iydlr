@@ -4,5 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+tensors = {path = "../tensors"}
+autodiff = {path = "../autodiff"}
+interfaces = {path = "../interfaces"}
 rand_chacha = "0.3.1"
 rand = "0.8.5"

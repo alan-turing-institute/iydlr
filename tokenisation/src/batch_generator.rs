@@ -2,7 +2,9 @@ use crate::tokeniser::Tokeniser;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-
+use tensors::TensorImpl;
+use autodiff::node::Node;
+use interfaces::tensors::Tensor;
 // Making a batch generator
 pub struct BatchGenerator {
     rng: ChaCha8Rng,
@@ -28,7 +30,7 @@ impl BatchGenerator {
         }
     }
 
-    pub fn sample(&mut self) -> TrainingExample {
+    fn sample(&mut self) -> TrainingExample {
         let rand_idx = self
             .rng
             .gen_range(0..self.tokens.len() - (self.chunk_len + 1));
@@ -36,6 +38,12 @@ impl BatchGenerator {
         let target = self.tokens[(rand_idx + 1)..(rand_idx + self.chunk_len + 1)].to_vec();
 
         TrainingExample { input, target }
+    }
+
+    pub fn sample_batch(&mut self) -> TensorImpl<Node<f64>> {
+        let tensor = TensorImpl::from_vec(&vec![self.batch_size, self.chunk_len, 1], data)
+        
+        todo!()
     }
 }
 
