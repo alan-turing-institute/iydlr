@@ -61,53 +61,39 @@ impl<T: RealElement + From<f64>> Node<T> {
     }
 
     // Set the gradient and initiate backward propagation.
-    pub fn backward(mut self, gradient: T) -> Self {
-        self.add_assign_grad(gradient.clone());
-        self.propagate_backward(gradient);
-        self
-    }
-
     // Propagate a given gradient on the `grad` of each associated Node.
     // Assumes the `grad` on self is not None.
-    pub fn propagate_backward(&mut self, grad: T) {
+    pub fn backward(&mut self, grad: T) {
         let self_val = self.val();
 
         // let node_content_ref = self.ptr.as_ref().borrow().deref();
         match self.ptr.as_ref().borrow_mut().deref_mut() {
             NodeContent::Sum(_, _, (ref mut np1, ref mut np2)) => {
-                np1.add_assign_grad(grad.clone());
-                np2.add_assign_grad(grad.clone());
-                np1.propagate_backward(grad.clone());
-                np2.propagate_backward(grad);
+                np1.backward(grad.clone());
+                np2.backward(grad.clone());
             }
             NodeContent::Prod(_, _, (ref mut np1, ref mut np2)) => {
                 let np1_grad = np2.val().to_owned() * grad.clone();
                 let np2_grad = np1.val().to_owned() * grad.clone();
-                np1.add_assign_grad(np1_grad.clone());
-                np2.add_assign_grad(np2_grad.clone());
-                np1.propagate_backward(np1_grad);
-                np2.propagate_backward(np2_grad);
+                np1.backward(np1_grad);
+                np2.backward(np2_grad);
             }
             NodeContent::Quot(_, _, (ref mut np_num, ref mut np_denom)) => {
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
                 let two = <f64 as Into<T>>::into(2_f64);
                 let np_num_grad = grad.clone() / np_denom.val().to_owned();
                 let np_denom_grad =
-                    minus_one * grad * np_num.val().to_owned() / np_denom.val().to_owned().pow(two);
-                np_num.add_assign_grad(np_num_grad.clone());
-                np_denom.add_assign_grad(np_denom_grad.clone());
-                np_num.propagate_backward(np_num_grad);
-                np_denom.propagate_backward(np_denom_grad);
+                    minus_one * grad.clone() * np_num.val().to_owned() / np_denom.val().to_owned().pow(two);
+                np_num.backward(np_num_grad);
+                np_denom.backward(np_denom_grad);
             }
             NodeContent::Exp(_, _, ref mut np) => {
-                let np_grad = grad * self_val;
-                np.add_assign_grad(np_grad.clone());
-                np.propagate_backward(np_grad);
+                let np_grad = grad.clone() * self_val;
+                np.backward(np_grad);
             }
             NodeContent::Ln(_, _, ref mut np) => {
-                let np_grad = grad * <f64 as Into<T>>::into(1_f64) / np.val();
-                np.add_assign_grad(np_grad.clone());
-                np.propagate_backward(np_grad);
+                let np_grad = grad.clone() * <f64 as Into<T>>::into(1_f64) / np.val();
+                np.backward(np_grad);
             }
             NodeContent::Pow(_, _, (ref mut np_b, ref mut np_e)) => {
                 // exponent . base^(exponent - 1)
@@ -117,16 +103,15 @@ impl<T: RealElement + From<f64>> Node<T> {
 
                 let np_b_grad =
                     grad.clone() * e_val.clone() * b_val.clone().pow(e_val.clone() + minus_one);
-                let np_e_grad = grad * b_val.clone().pow(e_val.to_owned()) * b_val.ln();
-                np_b.add_assign_grad(np_b_grad.clone());
+                let np_e_grad = grad.clone() * b_val.clone().pow(e_val.to_owned()) * b_val.ln();
 
                 // base^exponent . ln(base)
-                np_e.add_assign_grad(np_e_grad.clone());
-                np_b.propagate_backward(np_b_grad);
-                np_e.propagate_backward(np_e_grad);
+                np_b.backward(np_b_grad);
+                np_e.backward(np_e_grad);
             }
             NodeContent::Leaf(_, _) => {} // Do nothing.
         }
+        self.add_assign_grad(grad.clone());
     }
 }
 
@@ -666,13 +651,13 @@ mod tests {
         let node1 = Node::new(1.1, None);
         let node2 = Node::new(2.2, None);
 
-        let node = node1.clone() + node2.clone();
+        let mut node = node1.clone() + node2.clone();
 
         assert!(node.grad().is_none());
         assert!(node1.grad().is_none());
         assert!(node2.grad().is_none());
 
-        let node = node.backward(5.0);
+        node.backward(5.0);
 
         assert!(node.grad().is_some());
         assert_eq!(node.grad().unwrap(), 5.0_f64);
@@ -687,13 +672,13 @@ mod tests {
         let node1 = Node::new(1.1, None);
         let node2 = Node::new(2.2, None);
 
-        let node = node1.clone() * node2.clone();
+        let mut node = node1.clone() * node2.clone();
 
         assert!(node.grad().is_none());
         assert!(node1.grad().is_none());
         assert!(node2.grad().is_none());
 
-        let node = node.backward(5.0);
+        node.backward(5.0);
 
         assert!(node.grad().is_some());
         assert_eq!(node.grad().unwrap(), 5.0_f64);
@@ -711,7 +696,7 @@ mod tests {
         let node_c = Node::new(2.0, None);
 
         let node_d = node_a.clone() + node_b.clone();
-        let node_f = node_d.clone() * node_c.clone();
+        let mut node_f = node_d.clone() * node_c.clone();
 
         // Check all grads are None initially.
         assert!(node_f.grad().is_none());
@@ -720,7 +705,7 @@ mod tests {
         assert!(node_c.grad().is_none());
         assert!(node_d.grad().is_none());
 
-        let node_f = node_f.backward(10.0);
+        node_f.backward(10.0);
 
         // Check all grads have been populated.
         assert!(node_f.grad().is_some());
@@ -752,9 +737,9 @@ mod tests {
         let node_x_squared = node_x.clone().pow(node_2.clone());
         let node_2x_squared = node_x_squared.clone() * node_2_.clone();
 
-        let node_f = node_exp_5x.clone() + node_2x_squared.clone();
+        let mut node_f = node_exp_5x.clone() + node_2x_squared.clone();
 
-        let node_f = node_f.backward(1.0);
+        node_f.backward(1.0);
 
         // Check all grads have been populated.
         assert_eq!(node_f.grad().unwrap(), 1.0_f64);
@@ -801,8 +786,68 @@ mod tests {
         let node_1 = node_1.clone() / node_x.clone();
         let node_1 = node_1.clone() * node_x.clone();
         let node_1 = node_1.clone().exp();
-        let node_1 = node_1.clone() + (Node::from(-1.0) * node_314.clone());
-        let node_1 = node_1.backward(1.0);
+        let mut node_1 = node_1.clone() + (Node::from(-1.0) * node_314.clone());
+        node_1.backward(1.0);
         assert!(f64::abs(node_x.grad().unwrap() - 1.0_f64) < 1e-10);
+    }
+
+    #[test]
+    fn test_powers() {
+        let value = 3.5;
+        let node_x_1 = Node::new(value.clone(), None);
+        let node_xx = node_x_1.clone() * node_x_1.clone();
+        let mut node_xxx = node_xx.clone() * node_x_1.clone();
+        node_xxx.backward(1.0);
+        let grad1 = node_x_1.grad().unwrap();
+
+        let node_x_2 = Node::new(value.clone(), None);
+        let node_3 = Node::new(3.0, None);
+        let mut node_x_cubed = node_x_2.clone().pow(node_3.clone());
+        node_x_cubed.backward(1.0);
+        let grad2 = node_x_2.grad().unwrap();
+        assert_eq!(grad1, grad2);
+        assert_eq!(grad1, 3.0 * value.clone().pow(2.0));
+    }
+
+    #[test]
+    fn test_cyclic_graph() {
+        let val_a = 1.1;
+        let val_b = 1.2;
+        let val_c = 1.3;
+        let val_d = 1.4;
+        let a1 = Node::new(val_a, None);
+        let b1 = Node::new(val_b, None);
+        let c1 = Node::new(val_c, None);
+        let d1 = Node::new(val_d, None);
+        let ab1 = a1.clone() + b1.clone();
+        let abc1 = ab1.clone() + c1.clone();
+        let abd1 = ab1.clone() + d1.clone();
+        let mut result1 = abc1.clone() + abd1.clone();
+        result1.backward(1.0);
+        let grad_a1 = a1.grad().unwrap();
+        let grad_b1 = b1.grad().unwrap();
+        let grad_c1 = c1.grad().unwrap();
+        let grad_d1 = d1.grad().unwrap();
+
+        let a2 = Node::new(val_a, None);
+        let b2 = Node::new(val_b, None);
+        let c2 = Node::new(val_c, None);
+        let d2 = Node::new(val_d, None);
+        let mut result2 = a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
+        result2.backward(1.0);
+        let grad_a2 = a2.grad().unwrap();
+        let grad_b2 = b2.grad().unwrap();
+        let grad_c2 = c2.grad().unwrap();
+        let grad_d2 = d2.grad().unwrap();
+        assert!(f64::abs(result1.val() - result2.val()) < 1e-10);
+        assert!(f64::abs(result1.val() - (2.0*val_a + 2.0*val_b + val_c + val_d)) < 1e-10);
+        assert_eq!(grad_a1, grad_a2);
+        assert_eq!(grad_a1, 2.0);
+        assert_eq!(grad_b1, grad_b2);
+        assert_eq!(grad_b1, 2.0);
+        assert_eq!(grad_c1, grad_c2);
+        assert_eq!(grad_c1, 1.0);
+        assert_eq!(grad_d1, grad_d2);
+        assert_eq!(grad_d1, 1.0);
     }
 }
