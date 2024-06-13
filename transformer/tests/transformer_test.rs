@@ -25,7 +25,7 @@ fn transformer_test() {
     let config = &get_config();
     let model = Transformer::new(config);
     let mut batch_gen = BatchGenerator::new(
-        "hello transformer".to_string(),
+        "hellotransformer".to_string(),
         config.seq_len,
         config.batch_size,
         config.seed,
@@ -49,7 +49,7 @@ fn transformer_test() {
             "{:?}",
             pred_vec
                 .into_iter()
-                .map(|node| node.val())
+                .map(|node| node.val().round())
                 .collect::<Vec<_>>()
         );
         let loss = cce(&y, &pred);
