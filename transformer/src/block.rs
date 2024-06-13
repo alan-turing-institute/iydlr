@@ -1,4 +1,5 @@
 use attention::attention::SelfAttention;
+use config::Config;
 use interfaces::{
     deep_learning::{ActivationLayer, DLModule, LinearLayer},
     tensors::{RealElement, Tensor},
@@ -59,37 +60,79 @@ where
         // and the second linear layer projects back to the original embedding dimension.
 
         // TODO: implement residual connections
-        let att: T = self.self_attention.forward(x).unwrap();
-        let residual1: T = att.clone() + x.clone();
+        let att: T = self.self_attention.forward(x).unwrap(); // in: (B x T x C), out: (B x T x C)
+        let residual1: T = att.clone() + x.clone(); // in: (B x T x C), out: (B x T x C)
 
-        let lin: T = self.linear_layer1.forward(&residual1).unwrap();
-        let act: T = self.activation_layer.forward(&lin).unwrap();
-        let lin2: T = self.linear_layer2.forward(&act).unwrap();
+        let lin: T = self.linear_layer1.forward(&residual1).unwrap(); // in: (B x T x C), out: (B x T x 4C)
+        let act: T = self.activation_layer.forward(&lin).unwrap(); // in: (B x T x 4C), out: (B x T x 4C)
+        let lin2: T = self.linear_layer2.forward(&act).unwrap(); // in: (B x T x 4C), out: (B x T x C)
 
-        let residual2: T = lin2.clone() + residual1.clone();
+        let residual2: T = lin2.clone() + residual1.clone(); // in: (B x T x C), out: (B x T x C)
 
-        Ok(residual2)
+        Ok(residual2) // (B x T x C)
     }
 
     fn params(&self) -> Vec<E> {
-        todo!()
+        // pub self_attention: A,
+        // pub linear_layer1: L, // i: C, o: 4C
+        // pub activation_layer: Al,
+        // pub linear_layer2: L, // i: 4C, o: C
+        self.self_attention
+            .iter()
+            .flat_map(|layer| layer.params())
+            .chain(self.linear_layer1.iter().flat_map(|layer| layer.params()))
+            .chain(
+                self.activation_layer
+                    .iter()
+                    .flat_map(|layer| layer.params()),
+            )
+            .chain(self.linear_layer2.iter().flat_map(|layer| layer.params()))
+            .collect()
     }
 }
 
 // TODO: once activation is concrete
-// impl Block<LinLayer, MultiHeadAttention, TensorImpl, Node<f64>, > {
-//     fn new() -> Self {
-//         todo!()
-//     }
-// }
+impl Block<LinLayer, MultiHeadAttention, TensorImpl, Node<f64>> {
+    fn new(config: &Config, is_masked: bool) -> Self {
+        let self_attention = MultiHeadAttention::new(config, is_masked);
+        // Residual connection: add embedding matrix X to the output of the sub-layer element-wise
+        let linear_layer1 = LinLayer::new(config.embed_dim, 4 * config.embed_dim, config.seed);
+        let activation_layer = ActLayer::new();
+        let linear_layer2 = LinLayer::new(4 * config.embed_dim, config.embed_dim, config.seed);
+        // Residual connection: add embedding matrix X to the output of the sub-layer element-wise
+    }
+}
 
 #[cfg(test)]
 mod tests {
+    use crate::block;
+
     #[test]
-    fn test_block_constructor() {
-        todo!();
+    fn test_construct() {
+        let config = get_config();
+        let attention = MultiHeadAttention::new(&config, true);
+        assert_eq!(attention.num_heads, 4);
+        assert!(attention.mask.is_some());
+        // check that mask has the right shape
+        // print the shape of the mask
+        //println!("{:?}", attention.mask.as_ref().unwrap().shape());
+        assert_eq!(attention.mask.unwrap().shape(), vec![7, 7]);
+        assert_eq!(attention.query_weights.len(), 4);
+        // println!("{:?}", attention.query_weights[0].w);
+        println!("{:?}", attention.key_weights[0].w);
     }
-    fn test_transformer_constructor() {
-        todo!();
+
+    #[test]
+    fn test_forward() {
+        let config = get_config();
+        let block = Block::new(&config, true);
+        let x = Te::from_vec(
+            &vec![config.batch_size, config.seq_len, config.embed_dim],
+            &vec![Node::<f64>::zero(); config.batch_size * config.seq_len * config.embed_dim],
+        );
+        let out = block.forward(&x).unwrap();
+        let expected_shape = vec![2, 7, 20];
+        let actual_shape = out.shape();
+        assert_eq!(actual_shape, expected_shape);
     }
 }
