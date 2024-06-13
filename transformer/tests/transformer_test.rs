@@ -11,9 +11,10 @@ fn get_config() -> Config {
         batch_size: 1,
         seq_len: 8,
         embed_dim: 8,
-        vocab_size: 22,
+        // Currently this must be set as the same as the input text
+        vocab_size: 12,
         num_head: 4,
-        num_blocks: 4,
+        num_blocks: 1,
         seed: 0,
     }
 }
@@ -43,6 +44,14 @@ fn transformer_test() {
         println!("x shape: {:?}", x.shape());
         println!("y shape: {:?}", y.shape());
         let pred = model.forward(&x).unwrap();
+        let pred_vec: Vec<_> = pred.clone().into();
+        println!(
+            "{:?}",
+            pred_vec
+                .into_iter()
+                .map(|node| node.val())
+                .collect::<Vec<_>>()
+        );
         let loss = cce(y, pred);
         println!(
             "loss: {:?}",
@@ -53,8 +62,10 @@ fn transformer_test() {
         );
 
         optim.zero_grad();
+        println!("Backward...");
         loss.at(vec![0, 0, 0]).unwrap().clone().backward(1.0);
         optim.update(itr);
+        println!("Updated optim...");
     }
 
     // shape (1,B,1)

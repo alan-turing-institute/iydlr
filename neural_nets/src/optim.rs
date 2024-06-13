@@ -67,6 +67,6 @@ where
     E: RealElement + From<f64>,
 {
     let y_shape = y.shape();
-    let t_ones = T::fill_with_clone(vec![y_shape[0], 1, y_shape[2]], E::from(1.0));
+    let t_ones = T::fill_with_clone(vec![y_shape[0], y_shape[2]], E::from(1.0));
     (y * y_pred.ln()).matmul(&t_ones.transpose()).unwrap() // TODO: minus 1 *
 }

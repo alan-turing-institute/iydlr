@@ -25,10 +25,12 @@ pub trait Tensor<E>:
     //+ Sized
     + IntoIterator<Item = E>
     + Add<Output = Self>
+    + Sub<Output = Self>
     + Add<E, Output = Self>
     + Mul<Output = Self>
     + Mul<E, Output = Self>
     + Div<E, Output = Self>
+    + Div<Output = Self>
     + Into<Vec<E>>
 where
     E: Element,
