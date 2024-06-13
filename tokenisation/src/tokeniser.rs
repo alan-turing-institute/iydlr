@@ -1,27 +1,27 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 pub struct Tokeniser {
-    pub char_to_index: HashMap<char, usize>,
-    pub index_to_char: HashMap<usize, char>,
+    pub char_to_index: BTreeMap<char, usize>,
+    pub index_to_char: BTreeMap<usize, char>,
     vocab_size: usize,
 }
 
 impl Tokeniser {
     pub fn new(text: &str) -> Tokeniser {
         // find unique characters in text
-        let mut unique_chars = HashSet::new();
+        let mut unique_chars = BTreeSet::new();
         for c in text.chars() {
             unique_chars.insert(c);
         }
         // Build character to index Hash map
-        let mut char_to_index: HashMap<char, usize> = HashMap::new();
+        let mut char_to_index: BTreeMap<char, usize> = BTreeMap::new();
         let mut index = 0;
         for c in unique_chars {
             char_to_index.insert(c, index);
             index += 1;
         }
         // Build index to character hash map
-        let mut index_to_char: HashMap<usize, char> = HashMap::new();
+        let mut index_to_char: BTreeMap<usize, char> = BTreeMap::new();
         for (c, idx) in &char_to_index {
             index_to_char.insert(*idx, *c);
         }

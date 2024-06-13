@@ -101,11 +101,14 @@ mod tests {
     #[test]
     fn generate_batch() {
         let seed = 0;
-        let text = "this is some dummy text".into();
-        let chunk_len = 4;
-        let batch_size = 1;
+        let text = "this is dummy text".into();
+        let chunk_len = 3;
+        let batch_size = 2;
         let mut batch_gen = BatchGenerator::new(text, chunk_len, batch_size, seed);
 
         let (x, y) = batch_gen.sample_batch();
+
+        assert_eq!(x.shape(), vec![2, 3, 1]);
+        assert_eq!(y.shape(), vec![2, 3, 11]);
     }
 }
