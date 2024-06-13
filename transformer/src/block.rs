@@ -115,6 +115,9 @@ impl Block<La, Mal, Te, El, ActLayer<Te, El>> {
 
 #[cfg(test)]
 mod tests {
+    use autodiff::node::Node;
+    use num_traits::Zero;
+
     use super::*;
 
     fn get_config() -> Config {
@@ -128,32 +131,27 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_construct() {
-    //     let config = get_config();
-    //     let attention = MultiHeadAttention::new(&config, true);
-    //     assert_eq!(attention.num_heads, 4);
-    //     assert!(attention.mask.is_some());
-    //     // check that mask has the right shape
-    //     // print the shape of the mask
-    //     //println!("{:?}", attention.mask.as_ref().unwrap().shape());
-    //     assert_eq!(attention.mask.unwrap().shape(), vec![7, 7]);
-    //     assert_eq!(attention.query_weights.len(), 4);
-    //     // println!("{:?}", attention.query_weights[0].w);
-    //     println!("{:?}", attention.key_weights[0].w);
-    // }
+    #[test]
+    fn test_construct() {
+        let config = get_config();
+        // query + values + keys + lin layer 1 + lin layer 2
+        // 7 * 7
+        let block = Block::new(&config, true);
+        println!("{}", block.params().len());
+    }
 
-    // #[test]
-    // fn test_forward() {
-    //     let config = get_config();
-    //     let block = Block::new(&config, true);
-    //     let x = Te::from_vec(
-    //         &vec![config.batch_size, config.seq_len, config.embed_dim],
-    //         &vec![Node::<f64>::zero(); config.batch_size * config.seq_len * config.embed_dim],
-    //     );
-    //     let out = block.forward(&x).unwrap();
-    //     let expected_shape = vec![2, 7, 20];
-    //     let actual_shape = out.shape();
-    //     assert_eq!(actual_shape, expected_shape);
-    // }
+    #[test]
+    fn test_forward() {
+        let config = get_config();
+        let block = Block::new(&config, true);
+        let x = Te::from_vec(
+            &vec![config.batch_size, config.seq_len, config.embed_dim],
+            &vec![Node::<f64>::zero(); config.batch_size * config.seq_len * config.embed_dim],
+        )
+        .unwrap();
+        let out = block.forward(&x).unwrap();
+        let expected_shape = vec![2, 7, 20];
+        let actual_shape = out.shape();
+        assert_eq!(actual_shape, expected_shape);
+    }
 }
