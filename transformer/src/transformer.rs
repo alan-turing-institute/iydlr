@@ -111,6 +111,7 @@ mod tests {
         )
         .unwrap();
         let out = model.forward(&x).unwrap();
+        println!("{:?}", out);
         let expected_shape = vec![2, 7, 12];
         let actual_shape = out.shape();
         assert_eq!(actual_shape, expected_shape);
