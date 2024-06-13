@@ -8,3 +8,4 @@ attention = { version = "0.1.0", path = "../attention" }
 config = { version = "0.1.0", path = "../config" }
 interfaces = { version = "0.1.0", path = "../interfaces" }
 neural_nets = { version = "0.1.0", path = "../neural_nets" }
+tensors = { version = "0.1.0", path = "../tensors" }

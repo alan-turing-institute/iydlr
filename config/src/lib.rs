@@ -5,6 +5,7 @@ pub struct Config {
     pub seq_len: usize,
     pub embed_dim: usize,
     pub num_head: usize,
+    pub seed: u64,
 }
 
 #[cfg(test)]

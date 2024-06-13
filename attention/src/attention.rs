@@ -9,8 +9,6 @@ use tensors::TensorImpl;
 
 use std::marker::PhantomData;
 
-const SEED: u64 = 0;
-
 pub trait SelfAttention<T, E>: DLModule<T, E>
 where
     T: Tensor<E>,
@@ -41,12 +39,13 @@ where
     pub _marker_e: PhantomData<E>,
 }
 
-type El = Node<f64>;
-type Te = TensorImpl<El>;
-type La = LinLayer<Te, El>;
+pub type El = Node<f64>;
+pub type Te = TensorImpl<El>;
+pub type La = LinLayer<Te, El>;
+pub type Mal = MultiHeadAttention<Te, El, La>;
 
 impl MultiHeadAttention<Te, El, La> {
-    fn new(config: &Config, is_masked: bool) -> Self {
+    pub fn new(config: &Config, is_masked: bool) -> Self {
         // Generate weights tensors W_Q, W_K, W_V with shapes (embedding_dim, d_k),
         // where d_k is embedding_dim / num_heads. For now, we assume num_heads = 1.
         // Then generate W_Q, W_K, W_V with same shape (batch x sequence x channel)
@@ -79,13 +78,13 @@ impl MultiHeadAttention<Te, El, La> {
         // Q (B, T, C) * Q_W (B, C, T) = (B, T, T)
         // Q.matmaul(Q_W) : (B x T x C) x (C x T) -> (B x T x T)
         let query_weights: Vec<La> = (0..num_heads)
-            .map(|_| La::new(embed_dim, d_k, SEED))
+            .map(|_| La::new(embed_dim, d_k, config.seed))
             .collect();
         let value_weights: Vec<La> = (0..num_heads)
-            .map(|_| La::new(embed_dim, d_k, SEED))
+            .map(|_| La::new(embed_dim, d_k, config.seed))
             .collect();
         let key_weights: Vec<La> = (0..num_heads)
-            .map(|_| La::new(embed_dim, d_k, SEED))
+            .map(|_| La::new(embed_dim, d_k, config.seed))
             .collect();
 
         Self {
@@ -219,6 +218,7 @@ mod tests {
             seq_len: 7,
             embed_dim: 20,
             num_head: 4,
+            seed: 0,
         }
     }
 
