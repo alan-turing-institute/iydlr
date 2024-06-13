@@ -805,4 +805,64 @@ mod tests {
         let node_1 = node_1.backward(1.0);
         assert!(f64::abs(node_x.grad().unwrap() - 1.0_f64) < 1e-10);
     }
+
+    #[test]
+    fn test_powers() {
+        let value = 3.5;
+        let node_x_1 = Node::new(value.clone(), None);
+        let node_xx = node_x_1.clone() * node_x_1.clone();
+        let node_xxx = node_xx.clone() * node_x_1.clone();
+        node_xxx.backward(1.0);
+        let grad1 = node_x_1.grad().unwrap();
+
+        let node_x_2 = Node::new(value.clone(), None);
+        let node_3 = Node::new(3.0, None);
+        let node_x_cubed = node_x_2.clone().pow(node_3.clone());
+        node_x_cubed.backward(1.0);
+        let grad2 = node_x_2.grad().unwrap();
+        assert_eq!(grad1, grad2);
+        assert_eq!(grad1, 3.0 * value.clone().pow(2.0));
+    }
+
+    #[test]
+    fn test_cyclic_graph() {
+        let val_a = 1.1;
+        let val_b = 1.2;
+        let val_c = 1.3;
+        let val_d = 1.4;
+        let a1 = Node::new(val_a, None);
+        let b1 = Node::new(val_b, None);
+        let c1 = Node::new(val_c, None);
+        let d1 = Node::new(val_d, None);
+        let ab1 = a1.clone() + b1.clone();
+        let abc1 = ab1.clone() + c1.clone();
+        let abd1 = ab1.clone() + d1.clone();
+        let result1 = abc1.clone() + abd1.clone();
+        result1.clone().backward(1.0);
+        let grad_a1 = a1.grad().unwrap();
+        let grad_b1 = b1.grad().unwrap();
+        let grad_c1 = c1.grad().unwrap();
+        let grad_d1 = d1.grad().unwrap();
+
+        let a2 = Node::new(val_a, None);
+        let b2 = Node::new(val_b, None);
+        let c2 = Node::new(val_c, None);
+        let d2 = Node::new(val_d, None);
+        let result2 = a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
+        result2.clone().backward(1.0);
+        let grad_a2 = a2.grad().unwrap();
+        let grad_b2 = b2.grad().unwrap();
+        let grad_c2 = c2.grad().unwrap();
+        let grad_d2 = d2.grad().unwrap();
+        assert!(f64::abs(result1.val() - result2.val()) < 1e-10);
+        assert!(f64::abs(result1.val() - (2.0*val_a + 2.0*val_b + val_c + val_d)) < 1e-10);
+        assert_eq!(grad_a1, grad_a2);
+        assert_eq!(grad_a1, 2.0);
+        assert_eq!(grad_b1, grad_b2);
+        assert_eq!(grad_b1, 2.0);
+        assert_eq!(grad_c1, grad_c2);
+        assert_eq!(grad_c1, 1.0);
+        assert_eq!(grad_d1, grad_d2);
+        assert_eq!(grad_d1, 1.0);
+    }
 }
