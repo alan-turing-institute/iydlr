@@ -113,13 +113,13 @@ impl Zero for DualNumber {
     }
 }
 
-impl Element for DualNumber {}
+// impl Element for DualNumber {}
 
-impl RealElement for DualNumber {
-    fn neg_inf() -> Self {
-        Self::new(-f64::INFINITY, 0.)
-    }
-}
+// impl RealElement for DualNumber {
+//     fn neg_inf() -> Self {
+//         Self::new(-f64::INFINITY, 0.)
+//     }
+// }
 
 impl From<f64> for DualNumber {
     fn from(value: f64) -> Self {

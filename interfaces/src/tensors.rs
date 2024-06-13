@@ -3,7 +3,7 @@ use std::{
     cmp::PartialEq,
     error::Error,
     fmt::{Debug, Display},
-    ops::{Add, AddAssign, Div, Mul},
+    ops::{Add, AddAssign, Div, Mul, Sub},
 };
 use thiserror::Error;
 
@@ -68,6 +68,7 @@ pub trait Element:
     + Display
     + Add<Output = Self>
     + AddAssign
+    + Sub<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>
     + Zero
@@ -77,7 +78,7 @@ pub trait Element:
 /// A Subtrait of `Tensor`, extending the interface to include methods that require more
 /// "real number like" behaviour from the tensor elements. The `RealTensor` element must be an
 /// implementer of the `RealElement` trait.
-pub trait RealTensor<E>: Tensor<E> + Exp + Pow<E>
+pub trait RealTensor<E>: Tensor<E> + Exp + Pow<E> + Ln
 where
     E: RealElement,
 {

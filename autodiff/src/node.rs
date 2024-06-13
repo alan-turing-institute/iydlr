@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fmt::Display,
-    ops::{Add, AddAssign, Deref, DerefMut, Div, Mul},
+    ops::{Add, AddAssign, Deref, DerefMut, Div, Mul, Sub},
     rc::Rc,
 };
 
@@ -11,11 +11,8 @@ use interfaces::{
 };
 use num_traits::Zero;
 
-// type Ptr<N> = Box<N>;
 type Ptr<N> = Rc<RefCell<N>>;
 
-// TODO: Rename to NodeContent
-/// A node in a computation graph.
 #[derive(Debug)]
 pub enum NodeContent<T> {
     Sum(T, Option<T>, (Node<T>, Node<T>)),
@@ -27,28 +24,17 @@ pub enum NodeContent<T> {
     Leaf(T, Option<T>),
 }
 
+/// A node in a computation graph.
 #[derive(Debug)]
 pub struct Node<T> {
     ptr: Ptr<NodeContent<T>>,
 }
-
-// impl<T: RealElement + From<f64>> Deref for Node<T> {
-//     type Target = NodeContent<T>;
-
-//     fn deref(&self) -> &NodeContent<T> {
-//         self.ptr.deref().borrow().deref()
-//     }
-// }
 
 impl<T: RealElement + From<f64>> Node<T> {
     pub fn new(val: T, grad: Option<T>) -> Self {
         Node {
             ptr: Rc::new(RefCell::new(NodeContent::new(val, grad))),
         }
-    }
-
-    pub fn node(&self) -> NodeContent<T> {
-        self.ptr.deref().borrow().deref().clone()
     }
 
     pub fn val(&self) -> T {
@@ -61,6 +47,10 @@ impl<T: RealElement + From<f64>> Node<T> {
 
     pub fn set_grad(&mut self, new_grad: T) {
         self.ptr.deref().borrow_mut().deref_mut().set_grad(new_grad)
+    }
+
+    pub fn set_val(&mut self, new_val: T) {
+        self.ptr.deref().borrow_mut().deref_mut().set_val(new_val)
     }
 
     pub fn add_assign_grad(&mut self, new_grad: T) {
@@ -84,7 +74,8 @@ impl<T: RealElement + From<f64>> Node<T> {
         let self_grad = self.grad().unwrap();
         let self_val = self.val();
 
-        match self.node() {
+        // let node_content_ref = self.ptr.as_ref().borrow().deref();
+        match self.ptr.as_ref().borrow_mut().deref_mut() {
             NodeContent::Sum(_, _, (ref mut np1, ref mut np2)) => {
                 np1.add_assign_grad(self_grad.clone());
                 np2.add_assign_grad(self_grad);
@@ -101,7 +92,10 @@ impl<T: RealElement + From<f64>> Node<T> {
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
                 let two = <f64 as Into<T>>::into(2_f64);
                 np_num.add_assign_grad(self_grad.clone() / np_denom.val().to_owned());
-                np_denom.add_assign_grad(minus_one * self_grad * np_num.val().to_owned() / np_denom.val().to_owned().pow(two));
+                np_denom.add_assign_grad(
+                    minus_one * self_grad * np_num.val().to_owned()
+                        / np_denom.val().to_owned().pow(two),
+                );
                 np_num.propagate_backward();
                 np_denom.propagate_backward();
             }
@@ -186,6 +180,20 @@ impl<T: RealElement + From<f64>> NodeContent<T> {
         *g = Some(new_grad);
     }
 
+    pub fn set_val(&mut self, new_val: T) {
+        let v: &mut T = match self {
+            NodeContent::Sum(val, _, _)
+            | NodeContent::Prod(val, _, _)
+            | NodeContent::Quot(val, _, _)
+            | NodeContent::Exp(val, _, _)
+            | NodeContent::Ln(val, _, _)
+            | NodeContent::Pow(val, _, _)
+            | NodeContent::Leaf(val, _) => val,
+        };
+
+        *v = new_val;
+    }
+
     pub fn add_assign_grad(&mut self, new_grad: T) {
         let g: &mut Option<T> = match self {
             NodeContent::Sum(_, grad, _)
@@ -221,6 +229,28 @@ impl<T: RealElement + From<f64>> Add<Node<T>> for Node<T> {
 
     fn add(self, rhs: Node<T>) -> Self::Output {
         NodeContent::Sum(self.val() + rhs.val(), None, (self, rhs)).into()
+    }
+}
+
+impl<T: RealElement + From<f64>> Sub<Node<T>> for Node<T> {
+    type Output = Node<T>;
+
+    fn sub(self, mut rhs: Node<T>) -> Self::Output {
+        rhs = rhs * Node::from(-1.0);
+        NodeContent::Sum(self.val() + rhs.val(), None, (self, rhs)).into()
+    }
+}
+
+impl<T: RealElement + From<f64>> Sub<NodeContent<T>> for NodeContent<T> {
+    type Output = NodeContent<T>;
+
+    fn sub(self, mut rhs: NodeContent<T>) -> NodeContent<T> {
+        rhs = rhs * NodeContent::from(-1.0);
+        NodeContent::Sum(
+            self.val().clone() + rhs.val().clone(),
+            None,
+            (self.into(), rhs.into()),
+        )
     }
 }
 
@@ -313,7 +343,7 @@ impl<T: RealElement> AddAssign for NodeContent<T> {
 
 impl<T: RealElement> AddAssign for Node<T> {
     fn add_assign(&mut self, _rhs: Self) {
-        panic!("Unexpected call to AddAssign on a Node.")
+        *self = self.clone() + _rhs;
     }
 }
 
@@ -326,21 +356,6 @@ impl<T: RealElement> Display for NodeContent<T> {
 impl<T: RealElement> Display for Node<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Node: {:?}", self.ptr.deref().borrow())
-    }
-}
-
-// TODO: check this (was auto-generated). Is it what we want?
-impl<T: RealElement> Clone for NodeContent<T> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Sum(arg0, arg1, arg2) => Self::Sum(arg0.clone(), arg1.clone(), arg2.clone()),
-            Self::Prod(arg0, arg1, arg2) => Self::Prod(arg0.clone(), arg1.clone(), arg2.clone()),
-            Self::Quot(arg0, arg1, arg2) => Self::Quot(arg0.clone(), arg1.clone(), arg2.clone()),
-            Self::Exp(arg0, arg1, arg2) => Self::Exp(arg0.clone(), arg1.clone(), arg2.clone()),
-            Self::Ln(arg0, arg1, arg2) => Self::Ln(arg0.clone(), arg1.clone(), arg2.clone()),
-            Self::Pow(arg0, arg1, arg2) => Self::Pow(arg0.clone(), arg1.clone(), arg2.clone()),
-            Self::Leaf(arg0, arg1) => Self::Leaf(arg0.clone(), arg1.clone()),
-        }
     }
 }
 
@@ -411,19 +426,23 @@ impl<T: RealElement> Zero for Node<T> {
     }
 }
 
-impl<T: RealElement + From<f64>> Element for NodeContent<T> {}
-
-impl<T: RealElement + From<f64>> RealElement for NodeContent<T> {
-    fn neg_inf() -> Self {
-        NodeContent::new((-f64::INFINITY).into(), None)
-    }
-}
-
 impl<T: RealElement + From<f64>> Element for Node<T> {}
 
 impl<T: RealElement + From<f64>> RealElement for Node<T> {
     fn neg_inf() -> Self {
-        NodeContent::<T>::neg_inf().into()
+        Node::new((-f64::INFINITY).into(), None)
+    }
+}
+
+impl Into<f64> for Node<f64> {
+    fn into(self) -> f64 {
+        self.val()
+    }
+}
+
+impl From<usize> for Node<f64> {
+    fn from(value: usize) -> Self {
+        Node::new(value as f64, None)
     }
 }
 
@@ -529,15 +548,32 @@ mod tests {
     }
 
     #[test]
-    fn test_add_node_ptr() {
-        let node1 = NodeContent::<f64>::new(3.1, Some(0.4));
-        let node2 = NodeContent::<f64>::new(22.2, None);
+    fn test_add_node() {
+        let node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
 
-        let np1: Node<f64> = node1.into();
-        let np2 = node2.into();
-
-        let result = np1 + np2;
+        let result = node1 + node2;
         assert_eq!(result.val(), 25.3_f64);
+        assert_eq!(result.grad(), None);
+    }
+
+    #[test]
+    fn test_add_assign_node() {
+        let mut node1 = Node::<f64>::new(3.1, Some(0.4));
+        let node2 = Node::<f64>::new(22.2, None);
+
+        node1 += node2;
+        assert_eq!(node1.val(), 25.3_f64);
+        assert_eq!(node1.grad(), None);
+    }
+
+    #[test]
+    fn test_sub_node() {
+        let node1 = Node::<f64>::new(5.0, Some(0.4));
+        let node2 = Node::<f64>::new(7.0, None);
+
+        let result = node1 - node2;
+        assert_eq!(result.val(), -2.0_f64);
         assert_eq!(result.grad(), None);
     }
 
@@ -639,7 +675,6 @@ mod tests {
 
         assert!(node.grad().is_some());
         assert_eq!(node.grad().unwrap(), 5.0_f64);
-
         assert!(node1.grad().is_some());
         assert_eq!(node1.grad().unwrap(), 5.0_f64);
         assert!(node2.grad().is_some());

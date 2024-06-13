@@ -7,8 +7,8 @@ use statrs::distribution::Normal;
 use std::marker::PhantomData;
 
 pub struct LinLayer<T: Tensor<E>, E: Element> {
-    pub w: T,
-    pub b: T,
+    w: T,
+    b: T,
     tensor_element_phantom: PhantomData<E>,
 }
 
