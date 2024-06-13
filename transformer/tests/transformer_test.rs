@@ -52,7 +52,7 @@ fn transformer_test() {
                 .map(|node| node.val())
                 .collect::<Vec<_>>()
         );
-        let loss = cce(y, pred);
+        let loss = cce(&y, &pred);
         println!(
             "loss: {:?}",
             loss.clone()
