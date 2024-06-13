@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use autodiff::node::Node;
 use interfaces::deep_learning::DLModule;
 use interfaces::tensors::RealTensor;
@@ -12,7 +14,7 @@ use tensors::TensorImpl;
 #[test]
 fn xor_test() {
     let seed = 2;
-    let max_itr = 200;
+    let max_itr = 300;
     let batch_size = 5;
     let model: Serial<TensorImpl<Node<f64>>, Node<f64>> = Serial::new(vec![
         Box::new(LinLayer::new(2, 5, seed)),
@@ -81,4 +83,8 @@ fn xor_test() {
             .map(|node| node.val())
             .collect::<Vec<_>>()
     );
+
+    let loss_tensor = bce(y_tensor, class_0);
+    let loss = loss_tensor.dim_sum(vec![1]);
+    assert!(loss.at(vec![0, 0, 0]).unwrap().clone().val() < 0.1_f64)
 }
