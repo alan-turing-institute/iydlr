@@ -1,4 +1,3 @@
-use core::panic;
 use interfaces::deep_learning::{DLModule, LinearLayer};
 use interfaces::tensors::{Element, Tensor};
 use rand::distributions::Distribution;
@@ -21,27 +20,20 @@ where
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
-        //TODO: remove this restriction so that we can also
-        // let input_shape = x.shape();
-        // //The shape of the input tensor must be (B, T, C)
-        // if input_shape.len() != 3 {
-        //     return Err(
-        //         anyhow::Error::msg("The shape of the input tensor must be (B, T, C)").into(),
-        //     );
-        // } else {
-        //     return Ok(x.clone().matmul(&self.w.clone())? + self.b.clone());
-        // }
-        // TODO: remove this restriction so that we can also
         let input_shape = x.shape();
-
-        // The shape of the input tensor must be (B, T, C)
-        // if input_shape.len() != 3 {
-        //     return Err(
-        //         anyhow::Error::msg("The shape of the input tensor must be (B, T, C)").into(),
-        //     );
-        // } else {
-        return Ok(x.clone().matmul(&self.w.clone())? + self.b.clone());
-        // }
+        let mut b = self.b.clone();
+        // println!("Input shape : {:?}", input_shape);
+        // println!("Bias shape : {:?}", self.b.shape());
+        // If input has a batch dim, then reshape bias to enable
+        // broadcast over batch
+        if input_shape.len() > 2 {
+            let mut new_shape = vec![1];
+            new_shape.extend(b.shape());
+            // println!("New bias shape: {:?}", new_shape);
+            b.reshape(new_shape);
+            // println!("Reshaped bias: {:?}", b.shape());
+        }
+        Ok(x.clone().matmul(&self.w.clone())? + b)
     }
 
     fn params(&self) -> Vec<E> {
@@ -122,14 +114,14 @@ mod tests {
     }
 
     #[test]
-    fn three_dim_forward_2() {
-        // Test that the forward method works when the input tensor is 3D
+    fn two_dim_forward() {
+        // Test that the forward method works when the input tensor is 2D
         let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
-        let x = TensorImpl::from_vec(&vec![2, 2, 2], &vec![6.0; 8]).unwrap();
+        let x = TensorImpl::from_vec(&vec![2, 2], &vec![6.0; 4]).unwrap();
         println!("{:?}", x.shape());
         let out = layer.forward(&x).unwrap();
         println!("{:?}", out);
-        assert_eq!(out.shape(), vec![2, 2, 3]);
+        assert_eq!(out.shape(), vec![2, 3]);
     }
 
     #[test]

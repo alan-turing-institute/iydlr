@@ -50,15 +50,6 @@ impl<E: Element> TensorImpl<E> {
             .fold(0, |acc, (idx, stride)| acc + idx * stride);
     }
 
-    // TODO(mhauru) This should return something like a view, which references the same data but is
-    // a new object. I don't know how to do that though.
-    //fn reshape(&mut self, new_shape: Vec<usize>) {
-    //    if self.num_elements() != num_elements_from_shape(&new_shape) {
-    //        panic!("The number of elements in the new shape does not match the number of elements in the original shape.");
-    //    }
-    //    self.shape = new_shape;
-    //}
-
     /// Multiply the tensor by the transpose of a matrix.
     ///
     /// This is equivalent to `self.matmul(other.transpose())`, but faster.
@@ -531,6 +522,20 @@ where
             result = result.single_dim_sum(dim);
         }
         return result;
+    }
+
+    // TODO(mhauru) This should return something like a view, which references the same data but is
+    // a new object. I don't know how to do that though.
+    fn reshape(&mut self, new_shape: Vec<usize>) {
+        let num_els = self.num_elements();
+        let new_num_els = num_elements_from_shape(&new_shape);
+        // println!("Num els {}", num_els);
+        // println!("New num els{}", new_num_els);
+        // println!("Shape: {:?}", self.shape());
+        if self.num_elements() != num_elements_from_shape(&new_shape) {
+            panic!("The number of elements in the new shape does not match the number of elements in the original shape.");
+        }
+        self.shape = new_shape;
     }
 }
 
