@@ -61,3 +61,37 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tensors::TensorImpl;
+
+    #[test]
+    fn construct_act_layer() {
+        // The activation layer is constructed without any errors
+        let layer: ActLayer<TensorImpl<f64>, f64> = ActLayer::new();
+    }
+
+    #[test]
+    fn three_dim_forward() {
+        // The forward method of the activation layer is called without any errors
+        let layer: ActLayer<TensorImpl<f64>, f64> = ActLayer::new();
+        let x = TensorImpl::from_vec(&vec![2, 2, 2], &vec![6.0; 8]).unwrap();
+        println!("{:?}", x.shape());
+        let out = layer.forward(&x).unwrap();
+        assert_eq!(out.shape(), vec![2, 2, 2]);
+    }
+
+    #[test]
+    fn no_negative_values() {
+        // The ReLU function is applied to the input tensor
+        let layer: ActLayer<TensorImpl<f64>, f64> = ActLayer::new();
+        let x = TensorImpl::from_vec(&vec![1, 2, 2], &vec![-2.0, -1.0, 0.0, 1.0]).unwrap();
+        let out = layer.forward(&x).unwrap();
+        assert_eq!(
+            out,
+            TensorImpl::from_vec(&vec![1, 2, 2], &vec![0.0, 0.0, 0.0, 1.0]).unwrap()
+        )
+    }
+}
