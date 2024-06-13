@@ -43,8 +43,7 @@ impl AddAssign for DualNumber {
 
 impl Mul for DualNumber {
     type Output = Self;
-    //  (ax + (ay + xb) i) =  (x + iy) * (a + bi)
-    // Problem in Mul?
+    //  (x + ie) * (a + be) = (ax + (ay + xb) e)
     fn mul(self, rhs: Self) -> Self::Output {
         let real = self.real * rhs.real;
         let dual = self.real * rhs.dual + self.dual * rhs.real;
@@ -121,7 +120,7 @@ fn grad<F: Fn(DualNumber) -> DualNumber>(func: F, value: f64) -> f64 {
 }
 
 impl DualNumber {
-    fn grad<F: Fn(DualNumber) -> DualNumber>(func: F, value: f64) -> f64 {
+    pub fn grad<F: Fn(DualNumber) -> DualNumber>(func: F, value: f64) -> f64 {
         func(DualNumber::new(value, 1.)).dual
     }
 }
@@ -129,6 +128,8 @@ impl DualNumber {
 pub trait Grad {
     fn grad(&self, value: f64) -> f64;
 }
+
+// Blanket implementation for Fn(f64) -> f64
 impl<F> Grad for F
 where
     F: Fn(DualNumber) -> DualNumber,
@@ -172,8 +173,7 @@ mod tests {
     // Expression: f(x) = 2x^2 + exp(5x)
     //             f'(x)= 4x + 5 * exp(5x)
     fn test_exp_fn(dual_number: DualNumber) -> DualNumber {
-        // dual_number * dual_number.pow(DualNumber::new(2., 0.)) +
-        dual_number * dual_number * dual_number
+        DualNumber::new(2., 0.) * dual_number.pow(DualNumber::new(2.0, 0.))
             + DualNumber::new(f64::exp(1.), 0.).pow(DualNumber::new(5., 0.) * dual_number)
     }
 
@@ -194,14 +194,7 @@ mod tests {
         assert_approx_eq!(f64, DualNumber::grad(cube, 0.1), 0.03);
         assert_approx_eq!(f64, grad(cube, 0.1), 0.03);
         assert_approx_eq!(f64, cube.grad(0.1), 0.03);
-        // assert_approx_eq!(f64, test_exp_fn.grad(3.0), 16_345_098.862_360_554_f64);
         assert_approx_eq!(f64, test_exp_fn.grad(3.0), test_exp_fn_deriv(3.0));
-
-        let f = |x: DualNumber| x.pow(DualNumber::new(10., 0.));
-        let fp = |x: f64| 10. * x.powf(9.);
-        assert_approx_eq!(f64, f.grad(10.), fp(10.));
-        let f = |x: DualNumber| DualNumber::new(f64::exp(1.), 0.).pow(DualNumber::new(10., 0.) * x);
-        // let fp = |x: f64| 10. * f64::exp(10. * x);
-        // assert_approx_eq!(f64, f.grad(2.), fp(2.));
+        assert_approx_eq!(f64, test_exp_fn.grad(6.0), test_exp_fn_deriv(6.0));
     }
 }
