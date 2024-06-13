@@ -33,24 +33,20 @@ where
 
 impl Transformer<La, Mal, Te, El, ActLayer<Te, El>> {
     pub fn new(config: &Config) -> Self {
-        // let mut modules: Vec<Box<dyn DLModule<Te, El>>> = (0..config.num_blocks)
-        //     .map(|i| Box::new(Block::new(&config, i == 0)))
-        //     .collect();
-
-        let mut modules = (0..config.num_blocks)
-            .map(|i| Box::new(Block::new(&config, i == 0)))
-            .collect();
-        // modules.push(Box::new(LinLayer::new(
-        //     config.embed_dim,
-        //     config.vocab_size,
-        //     config.seed,
-        // )));
-        // let model: Serial<Te, El> = Serial::new(modules);
-        let model: Serial<Te, El> = Serial::new(
-            (0..config.num_blocks)
-                .map(|i| Box::new(Block::new(&config, i == 0)))
-                .collect::<Vec<_>>(),
-        );
+        let mut modules: Vec<
+            Box<dyn DLModule<Te, El, DLModuleError = <Te as Tensor<El>>::TensorError>>,
+        > = vec![];
+        for i in 0..config.num_blocks {
+            modules.push(Box::new(Block::new(&config, i == 0)));
+        }
+        modules.push(Box::new(LinLayer::new(
+            config.embed_dim,
+            config.vocab_size,
+            // config.vocab_size * config.seq_len,
+            config.seed,
+        )));
+        // modules.push(Box::new());
+        let model = Serial::new(modules);
         Self {
             model,
             _marker_a: PhantomData,
@@ -60,7 +56,7 @@ impl Transformer<La, Mal, Te, El, ActLayer<Te, El>> {
     }
 }
 
-impl<T, E, L, A, Al> DLModule<T, E> for Transformer<T, E, L, A, Al>
+impl<T, E, L, A, Al> DLModule<T, E> for Transformer<L, A, T, E, Al>
 where
     L: LinearLayer<T, E>,
     A: SelfAttention<T, E>,
