@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 
 // PELayer implementing DLModule.
 
+#[derive(Default)]
 pub struct PELayer<T: Tensor<E>, E: Element> {
     tensor_phantom: PhantomData<T>,
     tensor_element_phantom: PhantomData<E>,
@@ -38,6 +39,12 @@ where
     T: Tensor<E>,
     E: Element + From<f64>,
 {
+    pub fn new() -> Self {
+        Self {
+            tensor_phantom: PhantomData,
+            tensor_element_phantom: PhantomData,
+        }
+    }
     pub fn pos_encoding(seq_len: usize, d: usize, n: usize) -> T {
         if d % 2 != 0 {
             panic!("The dimension d must be even");
