@@ -533,6 +533,61 @@ impl<E> TensorImpl<E>
 where
     E: Element,
 {
+    pub fn get_data(&self) -> &Vec<E> {
+        self.data.as_ref()
+    }
+
+
+    // TODO (asmith) There is loads of copy-and-paste code from the
+    // `single_dim_sum` method. Ideally this should be refactored
+    pub fn slice(&self, dim: usize, idx: usize) -> Result<Self, &str> {
+        if dim >= self.shape.len() {
+            return Err("The provided dimension is out of bounds.");
+        }
+
+        if idx >= self.shape[dim] {
+            return Err("The provided index is out of bounds.");
+        }
+
+
+        let leading_dims = self.shape.iter().take(dim).into_iter().product::<usize>();
+        let trailing_dims = self
+            .shape
+            .iter()
+            .skip(dim + 1)
+            .into_iter()
+            .product::<usize>();
+
+        println!("leading_dims: {}", leading_dims);
+        println!("self.shape[dim]: {}", self.shape[dim]);
+        println!("trailing_dims: {}", trailing_dims);
+
+        let mut output_shape = self.shape.clone();
+        output_shape[dim] = 1;
+
+
+        let mut slice: Vec<E> = Vec::new();
+
+        // Outer loop needs to iterate over the size of the new shape
+        for lead_idx in 0..leading_dims {
+            for trail_idx in 0..trailing_dims {
+                for slice_idx in 0..self.shape[dim] {
+                    if slice_idx == idx {
+                        let idx = lead_idx * self.shape[dim] * trailing_dims
+                            + slice_idx * trailing_dims
+                            + trail_idx;
+                        slice.push(self.data[idx].clone());
+                    }
+                }
+            }
+        }
+
+        // println!("output_shape: {:?}", output_shape);
+        // println!("slice: {:?}", slice);
+        Ok(TensorImpl::from_vec(&output_shape, &slice).unwrap())
+
+    }
+
     ///// Sum across a single dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     ///// vector")
     fn single_dim_sum(&self, dim: usize) -> Self {
@@ -991,6 +1046,46 @@ mod tests {
         let expected_data = vec![1.0, 2.0];
         let tensor_ln = tensor.ln();
         assert_eq!(tensor_ln.data, expected_data);
+    }
+
+    #[test]
+    fn test_slice() {
+        // Test dim is too large
+        {
+            let shape = vec![2, 2];
+            let data = vec![1, 2, 3, 4];
+            let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+    
+            let slice = tensor.slice(5, 1);
+            assert!(slice.is_err());
+            assert_eq!(slice.err(), Some("The provided dimension is out of bounds."));
+        }
+
+        // Test idx is too large
+        {
+            let shape = vec![2, 2];
+            let data = vec![1, 2, 3, 4];
+            let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+    
+            let slice = tensor.slice(1, 5);
+            assert!(slice.is_err());
+            assert_eq!(slice.err(), Some("The provided index is out of bounds."));
+        }
+
+        // Test working case
+        let shape = vec![2, 2, 2];
+        let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+
+        let maybe_slice = tensor.slice(2,1);
+        let expected_shape = vec![2, 2, 1];
+        let expected_data = vec![2, 4, 6, 8];
+
+        assert!(maybe_slice.is_ok());
+        let slice = maybe_slice.unwrap();
+
+        assert_eq!(slice.shape(), expected_shape);
+        assert_eq!(slice.data, expected_data);
     }
 
     #[test]
