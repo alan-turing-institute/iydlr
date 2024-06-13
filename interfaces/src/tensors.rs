@@ -1,9 +1,9 @@
-use std::{
-    fmt::{Debug, Display},
-    ops::{Add, AddAssign, Div, Mul},
-    cmp::{PartialEq},
-};
 use num::traits::Zero;
+use std::{
+    cmp::PartialEq,
+    fmt::{Debug, Display},
+    ops::{Add, AddAssign, Div, Mul, Sub},
+};
 
 use crate::utils::{Exp, Ln, Pow};
 
@@ -48,15 +48,23 @@ where
 
 /// Collection of traits required by the elements of a Tensor.
 pub trait Element:
-    Debug + Clone + PartialEq + Display + Add<Output = Self> + AddAssign + Mul<Output = Self> + Div<Output = Self> + Zero
+    Debug
+    + Clone
+    + PartialEq
+    + Display
+    + Add<Output = Self>
+    + AddAssign
+    + Sub<Output = Self>
+    + Mul<Output = Self>
+    + Div<Output = Self>
+    + Zero
 {
 }
-
 
 /// A Subtrait of `Tensor`, extending the interface to include methods that require more
 /// "real number like" behaviour from the tensor elements. The `RealTensor` element must be an
 /// implementer of the `RealElement` trait.
-pub trait RealTensor<E>: Tensor<E> + Exp + Pow<E>
+pub trait RealTensor<E>: Tensor<E> + Exp + Pow<E> + Ln
 where
     E: RealElement,
 {
