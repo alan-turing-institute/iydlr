@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 pub struct Tokeniser {
-    char_to_index: HashMap<char, usize>,
-    index_to_char: HashMap<usize, char>,
+    pub char_to_index: HashMap<char, usize>,
+    pub index_to_char: HashMap<usize, char>,
+    vocab_size: usize,
 }
 
 impl Tokeniser {
@@ -26,6 +27,7 @@ impl Tokeniser {
         }
 
         Tokeniser {
+            vocab_size: char_to_index.len(),
             char_to_index,
             index_to_char,
         }
@@ -50,6 +52,10 @@ impl Tokeniser {
             result.push(*char);
         }
         result
+    }
+
+    pub fn vocab_size(&self) -> usize {
+        self.vocab_size
     }
 }
 

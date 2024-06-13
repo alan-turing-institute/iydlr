@@ -1,10 +1,11 @@
 use crate::tokeniser::Tokeniser;
+use autodiff::node::Node;
+use interfaces::tensors::Tensor;
 use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use std::iter::zip;
 use tensors::TensorImpl;
-use autodiff::node::Node;
-use interfaces::tensors::Tensor;
 // Making a batch generator
 pub struct BatchGenerator {
     rng: ChaCha8Rng,
@@ -13,6 +14,7 @@ pub struct BatchGenerator {
     tokens: Vec<usize>,
     chunk_len: usize,
     batch_size: usize,
+    vocab_size: usize,
 }
 
 impl BatchGenerator {
@@ -20,6 +22,7 @@ impl BatchGenerator {
         let rng = ChaCha8Rng::seed_from_u64(seed);
         let tokeniser = Tokeniser::new(&text);
         let tokens = tokeniser.encode(&text);
+        let vocab_size = tokeniser.vocab_size();
         BatchGenerator {
             rng,
             text,
@@ -27,6 +30,7 @@ impl BatchGenerator {
             tokens,
             chunk_len,
             batch_size,
+            vocab_size,
         }
     }
 
@@ -40,10 +44,31 @@ impl BatchGenerator {
         TrainingExample { input, target }
     }
 
-    pub fn sample_batch(&mut self) -> TensorImpl<Node<f64>> {
-        let tensor = TensorImpl::from_vec(&vec![self.batch_size, self.chunk_len, 1], data)
-        
-        todo!()
+    pub fn sample_batch(&mut self) -> (TensorImpl<Node<f64>>, TensorImpl<Node<f64>>) {
+        let (mut x_tensor, mut y_tensor) = (Vec::new(), Vec::new());
+        for _ in 0..self.batch_size {
+            let sample = self.sample();
+            for (x_token, y_token) in zip(sample.input, sample.target) {
+                let mut one_hot_x: Vec<Node<f64>> = vec![Node::from(0.0); self.vocab_size];
+                let mut one_hot_y: Vec<Node<f64>> = vec![Node::from(0.0); self.vocab_size];
+                one_hot_x[x_token] = Node::from(1.0);
+                one_hot_y[y_token] = Node::from(1.0);
+                x_tensor.extend(one_hot_x);
+                y_tensor.extend(one_hot_y);
+            }
+        }
+
+        let x = TensorImpl::from_vec(
+            &vec![self.batch_size, self.chunk_len, self.vocab_size],
+            &x_tensor,
+        )
+        .unwrap();
+        let y = TensorImpl::from_vec(
+            &vec![self.batch_size, self.chunk_len, self.vocab_size],
+            &y_tensor,
+        )
+        .unwrap();
+        (x, y)
     }
 }
 
@@ -57,7 +82,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn hello_world() {
+    fn generate_sample() {
         let seed = 0;
         let text = "this is some dummy text".into();
         let chunk_len = 4;
@@ -70,5 +95,16 @@ mod tests {
         assert_eq!(example.input[1], example.target[0]);
         assert_eq!(example.input[2], example.target[1]);
         assert_eq!(example.input[3], example.target[2]);
+    }
+
+    #[test]
+    fn generate_batch() {
+        let seed = 0;
+        let text = "this is some dummy text".into();
+        let chunk_len = 4;
+        let batch_size = 1;
+        let mut batch_gen = BatchGenerator::new(text, chunk_len, batch_size, seed);
+
+        let (x, y) = batch_gen.sample_batch();
     }
 }
