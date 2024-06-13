@@ -203,7 +203,7 @@ impl<E: Element> TensorImpl<E> {
         return result;
     }
 
-    fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
+    pub fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
         if self.shape() == other.shape() {
             return self.elementwise_binary_op_same_shape(other, op);
         } else {
@@ -386,7 +386,7 @@ impl<E: Element> Div<E> for TensorImpl<E> {
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
-    E: Element
+    E: Element,
 {
     type TensorError = AsStdError;
 
@@ -1115,12 +1115,14 @@ mod tests {
     fn test_softmax() {
         {
             let shape = vec![2, 3, 4, 5];
-            let data = (0u32..num_elements_from_shape(&shape) as u32).map(f64::from).collect::<Vec<f64>>();
+            let data = (0u32..num_elements_from_shape(&shape) as u32)
+                .map(f64::from)
+                .collect::<Vec<f64>>();
 
             let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
             let dim_to_softmax = 1;
             let result = tensor.softmax(dim_to_softmax);
-            
+
             // Shape should be the unchanged
             assert_eq!(result.shape(), shape.clone());
 

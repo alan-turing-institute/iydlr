@@ -21,7 +21,19 @@ where
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
+        //TODO: remove this restriction so that we can also
+        // let input_shape = x.shape();
+        // //The shape of the input tensor must be (B, T, C)
+        // if input_shape.len() != 3 {
+        //     return Err(
+        //         anyhow::Error::msg("The shape of the input tensor must be (B, T, C)").into(),
+        //     );
+        // } else {
+        //     return Ok(x.clone().matmul(&self.w.clone())? + self.b.clone());
+        // }
+        // TODO: remove this restriction so that we can also
         let input_shape = x.shape();
+
         // The shape of the input tensor must be (B, T, C)
         // if input_shape.len() != 3 {
         //     return Err(
@@ -100,6 +112,17 @@ mod tests {
 
     #[test]
     fn three_dim_forward() {
+        // Test that the forward method works when the input tensor is 3D
+        let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
+        let x = TensorImpl::from_vec(&vec![2, 2, 2], &vec![6.0; 8]).unwrap();
+        println!("{:?}", x.shape());
+        let out = layer.forward(&x).unwrap();
+        println!("{:?}", out);
+        assert_eq!(out.shape(), vec![2, 2, 3]);
+    }
+
+    #[test]
+    fn three_dim_forward_2() {
         // Test that the forward method works when the input tensor is 3D
         let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 3, 0);
         let x = TensorImpl::from_vec(&vec![2, 2, 2], &vec![6.0; 8]).unwrap();
