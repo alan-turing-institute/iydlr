@@ -63,15 +63,16 @@ where
         // and the second linear layer projects back to the original embedding dimension.
 
         // TODO: implement residual connections
+        println!("{}", "-".repeat(10));
         let att: T = self.self_attention.forward(x).unwrap(); // in: (B x T x C), out: (B x T x C)
         let residual1: T = att.clone() + x.clone(); // in: (B x T x C), out: (B x T x C)
-
+        println!("{}", "*".repeat(10));
         let lin: T = self.linear_layer1.forward(&residual1).unwrap(); // in: (B x T x C), out: (B x T x 4C)
         let act: T = self.activation_layer.forward(&lin).unwrap(); // in: (B x T x 4C), out: (B x T x 4C)
         let lin2: T = self.linear_layer2.forward(&act).unwrap(); // in: (B x T x 4C), out: (B x T x C)
 
         let residual2: T = lin2.clone() + residual1.clone(); // in: (B x T x C), out: (B x T x C)
-
+        println!("{}", "-".repeat(10));
         Ok(residual2) // (B x T x C)
     }
 
