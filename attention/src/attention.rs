@@ -63,6 +63,8 @@ impl MultiHeadAttention<Te, El, La> {
                         mask[j * matrix_dim + k] = Node::<f64>::zero();
                     } else {
                         mask[j * matrix_dim + k] = Node::<f64>::from(-1e9);
+                        // TODO(mhauru) Deal with this properly.
+                        //mask[j * matrix_dim + k] = Node::<f64>::neg_inf();
                     }
                 }
             }
