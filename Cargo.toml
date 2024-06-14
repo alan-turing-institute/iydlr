@@ -1,5 +1,16 @@
 [workspace]
 
-members = ["attention", "autodiff", "elements", "interfaces", "tensors", "neural_nets"]
+members = [
+    "attention",
+    "autodiff",
+    "elements",
+    "interfaces",
+    "tensors",
+    "tokenisation",
+    "neural_nets",
+    "transformer",
+    "config",
+    "embeddings",
+]
 
 resolver = "2"

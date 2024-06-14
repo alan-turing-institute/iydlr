@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
 use interfaces::{
@@ -38,6 +38,20 @@ impl AddAssign for DualNumber {
     fn add_assign(&mut self, rhs: Self) {
         self.real += rhs.real;
         self.dual += rhs.dual;
+    }
+}
+
+impl Sub for DualNumber {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        Self::new(self.real - rhs.real, self.dual - rhs.dual)
+    }
+}
+
+impl SubAssign for DualNumber {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.real -= rhs.real;
+        self.dual -= rhs.dual;
     }
 }
 

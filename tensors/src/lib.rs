@@ -50,15 +50,6 @@ impl<E: Element> TensorImpl<E> {
             .fold(0, |acc, (idx, stride)| acc + idx * stride);
     }
 
-    // TODO(mhauru) This should return something like a view, which references the same data but is
-    // a new object. I don't know how to do that though.
-    //fn reshape(&mut self, new_shape: Vec<usize>) {
-    //    if self.num_elements() != num_elements_from_shape(&new_shape) {
-    //        panic!("The number of elements in the new shape does not match the number of elements in the original shape.");
-    //    }
-    //    self.shape = new_shape;
-    //}
-
     /// Multiply the tensor by the transpose of a matrix.
     ///
     /// This is equivalent to `self.matmul(other.transpose())`, but faster.
@@ -115,7 +106,12 @@ impl<E: Element> TensorImpl<E> {
                             + j_inner * self_strides[self_num_dims - 1];
                         let other_idx = j2 * other_strides[other_num_dims - 2]
                             + j_inner * other_strides[other_num_dims - 1];
-                        accumulator += self.data[self_idx].clone() * other.data[other_idx].clone();
+
+                        // TODO: since AddAssign is not impl for Node currently, just use Add.
+                        // Revert this once AddAssign is implemented.
+                        // accumulator += self.data[self_idx].clone() * other.data[other_idx].clone();
+                        accumulator = accumulator
+                            + self.data[self_idx].clone() * other.data[other_idx].clone();
                     }
                     new_data.push(accumulator);
                 }
@@ -127,78 +123,8 @@ impl<E: Element> TensorImpl<E> {
         });
     }
 
-    fn add_same_shape(self, other: Self) -> Self {
-        let data: Vec<E> = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
-            .map(|(a, b)| a.clone() + b.clone())
-            .collect();
-        // TODO: Remove the unwrap, and return a Result instead
-        TensorImpl::from_vec(&self.shape(), &data).unwrap()
-    }
 
-    fn add_broadcast(self, other: Self) -> Self {
-        if self.num_dims() != other.num_dims() {
-            panic!("Shapes are not compatible for element-wise operations.");
-        }
-        let num_dims = self.num_dims();
-        for i in 0..self.shape.len() {
-            if self.shape[i] != other.shape[i] && self.shape[i] != 1 && other.shape[i] != 1 {
-                panic!("Shapes are not compatible for element-wise operations.");
-            }
-        }
-
-        let new_shape: Vec<usize> = self
-            .shape
-            .iter()
-            .zip(other.shape.iter())
-            .map(|(a, b)| std::cmp::max(a, b).clone())
-            .collect();
-        let result_num_elements = num_elements_from_shape(&new_shape);
-        let mut new_data: Vec<E> = Vec::with_capacity(result_num_elements);
-
-        let mut self_idx: Vec<usize> = vec![0; num_dims];
-        let mut other_idx: Vec<usize> = vec![0; num_dims];
-        let mut which_index_to_increment: usize;
-        while new_data.len() != result_num_elements {
-            let self_element = self.at(self_idx.clone()).unwrap();
-            let other_element = other.at(other_idx.clone()).unwrap();
-            new_data.push(self_element.clone() + other_element.clone());
-
-            // Increment the indices
-            which_index_to_increment = num_dims - 1;
-            while self_idx[which_index_to_increment] == self.shape[which_index_to_increment] - 1
-                && other_idx[which_index_to_increment] == other.shape[which_index_to_increment] - 1
-            {
-                if which_index_to_increment == 0 {
-                    break;
-                } else {
-                    which_index_to_increment -= 1;
-                }
-            }
-            if self.shape[which_index_to_increment] != 1 {
-                self_idx[which_index_to_increment] += 1;
-            }
-            for i in (which_index_to_increment + 1)..num_dims {
-                self_idx[i] = 0;
-            }
-            if other.shape[which_index_to_increment] != 1 {
-                other_idx[which_index_to_increment] += 1;
-            }
-            for i in (which_index_to_increment + 1)..num_dims {
-                other_idx[i] = 0;
-            }
-        }
-        let result = Self {
-            shape: new_shape,
-            data: new_data,
-        };
-        return result;
-    }
-
-    fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
+    pub fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
         if self.shape() == other.shape() {
             return self.elementwise_binary_op_same_shape(other, op);
         } else {
@@ -381,7 +307,7 @@ impl<E: Element> Div<E> for TensorImpl<E> {
 
 impl<E> Tensor<E> for TensorImpl<E>
 where
-    E: Element
+    E: Element,
 {
     type TensorError = AsStdError;
 
@@ -527,12 +453,81 @@ where
         }
         return result;
     }
+
+    // TODO(mhauru) This should return something like a view, which references the same data but is
+    // a new object. I don't know how to do that though.
+    fn reshape(&mut self, new_shape: Vec<usize>) {
+        let num_els = self.num_elements();
+        let new_num_els = num_elements_from_shape(&new_shape);
+        // println!("Num els {}", num_els);
+        // println!("New num els{}", new_num_els);
+        // println!("Shape: {:?}", self.shape());
+        if self.num_elements() != num_elements_from_shape(&new_shape) {
+            panic!("The number of elements in the new shape does not match the number of elements in the original shape.");
+        }
+        self.shape = new_shape;
+    }
 }
 
 impl<E> TensorImpl<E>
 where
     E: Element,
 {
+    pub fn get_data(&self) -> &Vec<E> {
+        self.data.as_ref()
+    }
+
+
+    // TODO (asmith) There is loads of copy-and-paste code from the
+    // `single_dim_sum` method. Ideally this should be refactored
+    pub fn slice(&self, dim: usize, idx: usize) -> Result<Self, &str> {
+        if dim >= self.shape.len() {
+            return Err("The provided dimension is out of bounds.");
+        }
+
+        if idx >= self.shape[dim] {
+            return Err("The provided index is out of bounds.");
+        }
+
+
+        let leading_dims = self.shape.iter().take(dim).into_iter().product::<usize>();
+        let trailing_dims = self
+            .shape
+            .iter()
+            .skip(dim + 1)
+            .into_iter()
+            .product::<usize>();
+
+        println!("leading_dims: {}", leading_dims);
+        println!("self.shape[dim]: {}", self.shape[dim]);
+        println!("trailing_dims: {}", trailing_dims);
+
+        let mut output_shape = self.shape.clone();
+        output_shape[dim] = 1;
+
+
+        let mut slice: Vec<E> = Vec::new();
+
+        // Outer loop needs to iterate over the size of the new shape
+        for lead_idx in 0..leading_dims {
+            for trail_idx in 0..trailing_dims {
+                for slice_idx in 0..self.shape[dim] {
+                    if slice_idx == idx {
+                        let idx = lead_idx * self.shape[dim] * trailing_dims
+                            + slice_idx * trailing_dims
+                            + trail_idx;
+                        slice.push(self.data[idx].clone());
+                    }
+                }
+            }
+        }
+
+        // println!("output_shape: {:?}", output_shape);
+        // println!("slice: {:?}", slice);
+        Ok(TensorImpl::from_vec(&output_shape, &slice).unwrap())
+
+    }
+
     ///// Sum across a single dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
     ///// vector")
     fn single_dim_sum(&self, dim: usize) -> Self {
@@ -562,7 +557,8 @@ where
                     let idx = lead_idx * self.shape[dim] * trailing_dims
                         + summing_idx * trailing_dims
                         + trail_idx;
-                    sum += self.data[idx].clone();
+                    // sum += self.data[idx].clone();
+                    sum = sum + self.data[idx].clone();
                 }
                 dim_sum.push(sum);
             }
@@ -994,6 +990,46 @@ mod tests {
     }
 
     #[test]
+    fn test_slice() {
+        // Test dim is too large
+        {
+            let shape = vec![2, 2];
+            let data = vec![1, 2, 3, 4];
+            let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+    
+            let slice = tensor.slice(5, 1);
+            assert!(slice.is_err());
+            assert_eq!(slice.err(), Some("The provided dimension is out of bounds."));
+        }
+
+        // Test idx is too large
+        {
+            let shape = vec![2, 2];
+            let data = vec![1, 2, 3, 4];
+            let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+    
+            let slice = tensor.slice(1, 5);
+            assert!(slice.is_err());
+            assert_eq!(slice.err(), Some("The provided index is out of bounds."));
+        }
+
+        // Test working case
+        let shape = vec![2, 2, 2];
+        let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
+
+        let maybe_slice = tensor.slice(2,1);
+        let expected_shape = vec![2, 2, 1];
+        let expected_data = vec![2, 4, 6, 8];
+
+        assert!(maybe_slice.is_ok());
+        let slice = maybe_slice.unwrap();
+
+        assert_eq!(slice.shape(), expected_shape);
+        assert_eq!(slice.data, expected_data);
+    }
+
+    #[test]
     fn test_concat() {
         let mut rng = rand::thread_rng();
 
@@ -1109,12 +1145,14 @@ mod tests {
     fn test_softmax() {
         {
             let shape = vec![2, 3, 4, 5];
-            let data = (0u32..num_elements_from_shape(&shape) as u32).map(f64::from).collect::<Vec<f64>>();
+            let data = (0u32..num_elements_from_shape(&shape) as u32)
+                .map(f64::from)
+                .collect::<Vec<f64>>();
 
             let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
             let dim_to_softmax = 1;
             let result = tensor.softmax(dim_to_softmax);
-            
+
             // Shape should be the unchanged
             assert_eq!(result.shape(), shape.clone());
 
