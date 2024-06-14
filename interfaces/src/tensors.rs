@@ -1,6 +1,6 @@
 use num::traits::Zero;
 use std::{
-    cmp::PartialEq,
+    cmp::{PartialEq, PartialOrd},
     error::Error,
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul, Sub},
@@ -27,6 +27,7 @@ pub trait Tensor<E>:
     + Add<Output = Self>
     + Sub<Output = Self>
     + Add<E, Output = Self>
+    + Sub<E, Output = Self>
     + Mul<Output = Self>
     + Mul<E, Output = Self>
     + Div<E, Output = Self>
@@ -108,7 +109,7 @@ where
 // }
 
 /// A Subtrait of `Element`, extending the trait to capture "real number like" behaviour.
-pub trait RealElement: Element + Exp + Pow + Ln + From<f64> {
+pub trait RealElement: Element + Exp + Pow + Ln + From<f64> + PartialOrd {
     fn neg_inf() -> Self;
 }
 

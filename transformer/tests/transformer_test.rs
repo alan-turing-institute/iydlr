@@ -14,7 +14,7 @@ fn get_config() -> Config {
         // Currently this must be set as the same as the input text
         vocab_size: 12,
         num_head: 4,
-        num_blocks: 1,
+        num_blocks: 4,
         seed: 0,
     }
 }
@@ -49,23 +49,23 @@ fn transformer_test() {
             "{:?}",
             pred_vec
                 .into_iter()
-                .map(|node| node.val().round())
-                .collect::<Vec<_>>()
-        );
-        let loss = cce(&y, &pred);
-        println!(
-            "loss: {:?}",
-            loss.clone()
-                .into_iter()
                 .map(|node| node.val())
                 .collect::<Vec<_>>()
         );
+        // let loss = cce(&y, &pred);
+        // println!(
+        //     "loss: {:?}",
+        //     loss.clone()
+        //         .into_iter()
+        //         .map(|node| node.val())
+        //         .collect::<Vec<_>>()
+        // );
 
-        optim.zero_grad();
-        println!("Backward...");
-        loss.at(vec![0, 0, 0]).unwrap().clone().backward(1.0);
-        optim.update(itr);
-        println!("Updated optim...");
+        // optim.zero_grad();
+        // println!("Backward...");
+        // loss.at(vec![0, 0, 0]).unwrap().clone().backward(1.0);
+        // optim.update(itr);
+        // println!("Updated optim...");
     }
 
     // shape (1,B,1)

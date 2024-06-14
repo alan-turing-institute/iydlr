@@ -20,15 +20,30 @@ where
 {
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
+    // fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
+    //     let shape = x.shape();
+    //     let sum = x.dim_sum(vec![shape.len() - 1]);
+    //     //let mean = x.clone() / sum;
+    //     let mean = x.clone() / sum;
+    //     let diff: T = x.clone() - mean.clone();
+    //     let diff_squared = diff.clone() * diff.clone();
+    //     let sd = (diff_squared.clone()
+    //         / (diff_squared.dim_sum(vec![shape.len() - 1]) + E::from(f64::EPSILON)))
+    //     .pow(E::from(0.5));
+
+    //     Ok(diff / sd)
+    // }
+
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
-        let shape = x.shape();
-        let sum = x.dim_sum(vec![shape.len() - 1]);
-        let mean = x.clone() / sum;
+        let t_small = E::from(f64::EPSILON);
+        let n_dims = x.shape().len();
+        let sum = x.dim_sum(vec![n_dims - 1]);
+        let mean = x.clone() / (sum + t_small.clone());
         let diff: T = x.clone() - mean.clone();
         let diff_squared = diff.clone() * diff.clone();
-        let sd = (diff_squared.clone()
-            / (diff_squared.dim_sum(vec![shape.len() - 1]) + E::from(f64::EPSILON)))
-        .pow(E::from(0.5));
+        let diff_squared_sum = diff_squared.dim_sum(vec![n_dims - 1]);
+        let sd = (diff_squared.clone() / (diff_squared_sum + t_small.clone()) + t_small.clone())
+            .pow(E::from(0.5));
 
         Ok(diff / sd)
     }
