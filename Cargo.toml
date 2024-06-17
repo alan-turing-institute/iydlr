@@ -3,7 +3,6 @@
 members = [
     "attention",
     "autodiff",
-    "elements",
     "interfaces",
     "tensors",
     "tokenisation",

@@ -1,3 +1,4 @@
+pub mod dual_number;
 pub mod node;
 
 // pub fn add(left: usize, right: usize) -> usize {

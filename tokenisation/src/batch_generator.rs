@@ -1,5 +1,6 @@
 use crate::tokeniser::Tokeniser;
 use autodiff::node::Node;
+use interfaces::tensors::RealElement;
 use interfaces::tensors::Tensor;
 use rand::Rng;
 use rand::SeedableRng;
@@ -44,16 +45,16 @@ impl BatchGenerator {
         TrainingExample { input, target }
     }
 
-    pub fn sample_batch(&mut self) -> (TensorImpl<Node<f64>>, TensorImpl<Node<f64>>) {
+    pub fn sample_batch<E: RealElement + From<f64>>(&mut self) -> (TensorImpl<E>, TensorImpl<E>) {
         let (mut x_tensor, mut y_tensor) = (Vec::new(), Vec::new());
         for _ in 0..self.batch_size {
             let sample = self.sample();
             for (x_token, y_token) in zip(sample.input, sample.target) {
                 // let mut one_hot_x: Vec<Node<f64>> = vec![Node::from(0.0); self.vocab_size];
-                let mut one_hot_y: Vec<Node<f64>> = vec![Node::from(0.0); self.vocab_size];
+                let mut one_hot_y: Vec<E> = vec![E::zero(); self.vocab_size];
                 // one_hot_x[x_token] = Node::from(1.0);
-                one_hot_y[y_token] = Node::from(1.0);
-                x_tensor.push(Node::from(x_token));
+                one_hot_y[y_token] = E::from(1.0);
+                x_tensor.push(E::from(x_token as f64));
                 y_tensor.extend(one_hot_y);
             }
         }
@@ -106,6 +107,6 @@ mod tests {
         let batch_size = 1;
         let mut batch_gen = BatchGenerator::new(text, chunk_len, batch_size, seed);
 
-        let (x, y) = batch_gen.sample_batch();
+        let (x, y) = batch_gen.sample_batch::<Node<f64>>();
     }
 }

@@ -1,6 +1,6 @@
 use std::{
-    cmp::{PartialOrd, Ordering},
     cell::RefCell,
+    cmp::{Ordering, PartialOrd},
     fmt::Display,
     ops::{Add, AddAssign, Deref, DerefMut, Div, Mul, Sub},
     rc::Rc,
@@ -11,6 +11,8 @@ use interfaces::{
     utils::{Exp, Ln, Pow},
 };
 use num_traits::Zero;
+
+const NEG_INF: f64 = -1_000_000_000_000.;
 
 type Ptr<N> = Rc<RefCell<N>>;
 
@@ -83,8 +85,8 @@ impl<T: RealElement + From<f64>> Node<T> {
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
                 let two = <f64 as Into<T>>::into(2_f64);
                 let np_num_grad = grad.clone() / np_denom.val().to_owned();
-                let np_denom_grad =
-                    minus_one * grad.clone() * np_num.val().to_owned() / np_denom.val().to_owned().pow(two);
+                let np_denom_grad = minus_one * grad.clone() * np_num.val().to_owned()
+                    / np_denom.val().to_owned().pow(two);
                 np_num.backward(np_num_grad);
                 np_denom.backward(np_denom_grad);
             }
@@ -423,7 +425,7 @@ impl<T: RealElement + From<f64>> Element for Node<T> {}
 
 impl<T: RealElement + From<f64>> RealElement for Node<T> {
     fn neg_inf() -> Self {
-        Node::new((-f64::INFINITY).into(), None)
+        Node::new((-NEG_INF).into(), None)
     }
 }
 
@@ -840,14 +842,15 @@ mod tests {
         let b2 = Node::new(val_b, None);
         let c2 = Node::new(val_c, None);
         let d2 = Node::new(val_d, None);
-        let mut result2 = a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
+        let mut result2 =
+            a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
         result2.backward(1.0);
         let grad_a2 = a2.grad().unwrap();
         let grad_b2 = b2.grad().unwrap();
         let grad_c2 = c2.grad().unwrap();
         let grad_d2 = d2.grad().unwrap();
         assert!(f64::abs(result1.val() - result2.val()) < 1e-10);
-        assert!(f64::abs(result1.val() - (2.0*val_a + 2.0*val_b + val_c + val_d)) < 1e-10);
+        assert!(f64::abs(result1.val() - (2.0 * val_a + 2.0 * val_b + val_c + val_d)) < 1e-10);
         assert_eq!(grad_a1, grad_a2);
         assert_eq!(grad_a1, 2.0);
         assert_eq!(grad_b1, grad_b2);

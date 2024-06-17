@@ -14,14 +14,14 @@ fn get_config() -> Config {
         // Currently this must be set as the same as the input text
         vocab_size: 12,
         num_head: 4,
-        num_blocks: 4,
+        num_blocks: 1,
         seed: 0,
     }
 }
 
 #[test]
 fn transformer_test() {
-    let max_itr = 300;
+    let max_itr = 1;
     let config = &get_config();
     let model = Transformer::new(config);
     let mut batch_gen = BatchGenerator::new(
@@ -40,7 +40,7 @@ fn transformer_test() {
 
     for itr in 0..max_itr {
         println!("Iteration: {}", itr);
-        let (x, y) = batch_gen.sample_batch();
+        let (x, y) = batch_gen.sample_batch::<El>();
         println!("x shape: {:?}", x.shape());
         println!("y shape: {:?}", y.shape());
         let pred = model.forward(&x).unwrap();

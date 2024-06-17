@@ -1,6 +1,6 @@
 use num_traits::Zero;
 
-use autodiff::node::Node;
+use autodiff::{dual_number::DualNumberPtr, node::Node};
 use config::Config;
 use interfaces::deep_learning::{DLModule, LinearLayer};
 use interfaces::tensors::{RealElement, RealTensor, Tensor};
@@ -39,7 +39,8 @@ where
     pub _marker_e: PhantomData<E>,
 }
 
-pub type El = Node<f64>;
+// pub type El = Node<f64>;
+pub type El = DualNumberPtr;
 pub type Te = TensorImpl<El>;
 pub type La = LinLayer<Te, El>;
 pub type Mal = MultiHeadAttention<Te, El, La>;
@@ -55,14 +56,14 @@ impl MultiHeadAttention<Te, El, La> {
         // let batch_size = config.batch_size;
         let d_k = config.embed_dim / config.num_head;
         let mask: Option<Te> = if is_masked {
-            let mut mask: Vec<Node<f64>> = vec![Node::<f64>::zero(); seq_len * seq_len];
+            let mut mask: Vec<El> = vec![El::zero(); seq_len * seq_len];
             let matrix_dim = seq_len;
             for j in 0..matrix_dim {
                 for k in 0..matrix_dim {
                     if k >= j {
-                        mask[j * matrix_dim + k] = Node::<f64>::zero();
+                        mask[j * matrix_dim + k] = El::zero();
                     } else {
-                        mask[j * matrix_dim + k] = Node::<f64>::from(-1e9);
+                        mask[j * matrix_dim + k] = El::neg_inf();
                         // TODO(mhauru) Deal with this properly.
                         //mask[j * matrix_dim + k] = Node::<f64>::neg_inf();
                     }

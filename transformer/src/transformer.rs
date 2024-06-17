@@ -112,7 +112,7 @@ mod tests {
         let model = Transformer::new(&config);
         let x = Te::from_vec(
             &vec![config.batch_size, config.seq_len, 1],
-            &vec![Node::<f64>::zero(); config.batch_size * config.seq_len * 1],
+            &vec![El::zero(); config.batch_size * config.seq_len * 1],
         )
         .unwrap();
         let out = model.forward(&x).unwrap();

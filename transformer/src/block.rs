@@ -125,7 +125,7 @@ impl Block<La, Mal, Te, El, ActLayer<Te, El>, NormLayer<Te, El>> {
 
 #[cfg(test)]
 mod tests {
-    use autodiff::node::Node;
+
     use num_traits::Zero;
 
     use super::*;
@@ -157,7 +157,7 @@ mod tests {
         let block = Block::new(&config, true);
         let x = Te::from_vec(
             &vec![config.batch_size, config.seq_len, config.embed_dim],
-            &vec![Node::<f64>::zero(); config.batch_size * config.seq_len * config.embed_dim],
+            &vec![El::zero(); config.batch_size * config.seq_len * config.embed_dim],
         )
         .unwrap();
         let out = block.forward(&x).unwrap();
