@@ -222,6 +222,7 @@ mod tests {
             embed_dim: 20,
             num_head: 4,
             seed: 0,
+            num_blocks: 1,
         }
     }
 
