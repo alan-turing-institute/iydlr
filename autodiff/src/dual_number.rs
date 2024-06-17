@@ -44,10 +44,23 @@ impl AddAssign for DualNumber {
         self.dual += rhs.dual;
     }
 }
+impl Sub for DualNumber {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        Self::new(self.real - rhs.real, self.dual - rhs.dual)
+    }
+}
+
+impl SubAssign for DualNumber {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.real -= rhs.real;
+        self.dual -= rhs.dual;
+    }
+}
 
 impl Mul for DualNumber {
     type Output = Self;
-    //  (ax + (ay + xb) i) =  (x + iy) * (a + bi)
+    //  (x + ie) * (a + be) = (ax + (ay + xb) e)
     fn mul(self, rhs: Self) -> Self::Output {
         let real = self.real * rhs.real;
         let dual = self.real * rhs.dual + self.dual * rhs.real;
@@ -103,7 +116,7 @@ impl Ln for DualNumber {
 impl Pow for DualNumber {
     fn pow(self, exp: Self) -> Self {
         let real = self.real.powf(exp.real);
-        let dual = real * (exp.dual * self.real.ln() + exp.real * self.dual / self.real);
+        let dual = real * (exp.dual * self.real.ln() + (self.dual * exp.real / self.real));
         Self::new(real, dual)
     }
 }
@@ -117,7 +130,7 @@ impl Zero for DualNumber {
     }
 }
 
-// impl Element for DualNumber {}
+impl Element for DualNumber {}
 
 fn grad<F: Fn(DualNumber) -> DualNumber>(func: F, value: f64) -> f64 {
     func(DualNumber::new(value, 1.)).dual
@@ -130,7 +143,7 @@ impl DualNumber {
 }
 
 pub trait Grad {
-    fn grad(&self, value: f64) -> f64;
+    fn grad_fn(&self, value: f64) -> f64;
 }
 
 // Blanket implementation for Fn(f64) -> f64
@@ -138,7 +151,7 @@ impl<F> Grad for F
 where
     F: Fn(DualNumber) -> DualNumber,
 {
-    fn grad(&self, value: f64) -> f64 {
+    fn grad_fn(&self, value: f64) -> f64 {
         grad(self, value)
     }
 }
@@ -371,12 +384,23 @@ mod tests {
         assert_approx_eq!(f64, result.dual, 0.03);
     }
 
+    // Expression: f(x) = 2x^2 + exp(5x)
+    //             f'(x)= 4x + 5 * exp(5x)
+    fn test_exp_fn(dual_number: DualNumber) -> DualNumber {
+        DualNumber::new(2., 0.) * dual_number.pow(DualNumber::new(2.0, 0.))
+            + DualNumber::new(f64::exp(1.), 0.).pow(DualNumber::new(5., 0.) * dual_number)
+    }
+
+    fn test_exp_fn_deriv(value: f64) -> f64 {
+        4. * value + 5. * f64::exp(1.).powf(5. * value)
+    }
+
     #[test]
     fn test_grad() {
         assert_approx_eq!(f64, DualNumber::grad_fn(cube, 0.1), 0.03);
         assert_approx_eq!(f64, grad(cube, 0.1), 0.03);
-        assert_approx_eq!(f64, cube.grad(0.1), 0.03);
-        assert_approx_eq!(f64, test_exp_fn.grad(3.0), test_exp_fn_deriv(3.0));
-        assert_approx_eq!(f64, test_exp_fn.grad(6.0), test_exp_fn_deriv(6.0));
+        assert_approx_eq!(f64, cube.grad_fn(0.1), 0.03);
+        assert_approx_eq!(f64, test_exp_fn.grad_fn(3.0), test_exp_fn_deriv(3.0));
+        assert_approx_eq!(f64, test_exp_fn.grad_fn(6.0), test_exp_fn_deriv(6.0));
     }
 }
