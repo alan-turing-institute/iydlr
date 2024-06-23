@@ -1002,26 +1002,26 @@ mod tests {
     //     assert_eq!(node_x.grad().unwrap(), 16345098.862360553196509_f64);
     // }
 
-    // #[test]
-    // fn test_overly_complicated_identity_function() {
-    //     // Expression: f(x) = exp(
-    //     //  x*(
-    //     //    ln(
-    //     //     (x+3.14)
-    //     //    )/x
-    //     //   )
-    //     // ) - 3.14 = x
-    //     let node_x = Node::new(3.0, None);
-    //     let node_314 = Node::new(3.14, None);
-    //     let node_1 = node_x.clone() + node_314.clone();
-    //     let node_1 = node_1.clone().ln();
-    //     let node_1 = node_1.clone() / node_x.clone();
-    //     let node_1 = node_1.clone() * node_x.clone();
-    //     let node_1 = node_1.clone().exp();
-    //     let mut node_1 = node_1.clone() + (Node::from(-1.0) * node_314.clone());
-    //     node_1.backward(1.0);
-    //     assert!(f64::abs(node_x.grad().unwrap() - 1.0_f64) < 1e-10);
-    // }
+    #[test]
+    fn test_overly_complicated_identity_function() {
+        // Expression: f(x) = exp(
+        //  x*(
+        //    ln(
+        //     (x+3.14)
+        //    )/x
+        //   )
+        // ) - 3.14 = x
+        let node_x = Node::new(TensorImpl::fill_with_clone(vec![2, 2], 3.0), None);
+        let node_314 = Node::new(TensorImpl::fill_with_clone(vec![2, 2], 3.14), None);
+        let node_1 = node_x.clone() + node_314.clone();
+        let node_1 = node_1.clone().ln();
+        let node_1 = node_1.clone() / node_x.clone();
+        let node_1 = node_1.clone() * node_x.clone();
+        let node_1 = node_1.clone().exp();
+        let mut node_1 = node_1.clone() + (Node::from(-1.0) * node_314.clone());
+        node_1.backward(TensorImpl::fill_with_clone(vec![2, 2], 1.0));
+        assert!(f64::abs((node_x.grad().clone().unwrap() - 1.0_f64).get_data()[0]) < 1e-10);
+    }
 
     // #[test]
     // fn test_powers() {
@@ -1041,46 +1041,62 @@ mod tests {
     //     assert_eq!(grad1, 3.0 * value.clone().pow(2.0));
     // }
 
-    // #[test]
-    // fn test_cyclic_graph() {
-    //     let val_a = 1.1;
-    //     let val_b = 1.2;
-    //     let val_c = 1.3;
-    //     let val_d = 1.4;
-    //     let a1 = Node::new(val_a, None);
-    //     let b1 = Node::new(val_b, None);
-    //     let c1 = Node::new(val_c, None);
-    //     let d1 = Node::new(val_d, None);
-    //     let ab1 = a1.clone() + b1.clone();
-    //     let abc1 = ab1.clone() + c1.clone();
-    //     let abd1 = ab1.clone() + d1.clone();
-    //     let mut result1 = abc1.clone() + abd1.clone();
-    //     result1.backward(1.0);
-    //     let grad_a1 = a1.grad().unwrap();
-    //     let grad_b1 = b1.grad().unwrap();
-    //     let grad_c1 = c1.grad().unwrap();
-    //     let grad_d1 = d1.grad().unwrap();
+    #[test]
+    fn test_cyclic_graph() {
+        let val_a = TensorImpl::fill_with_clone(vec![2, 3], 1.1);
+        let val_b = TensorImpl::fill_with_clone(vec![2, 3], 1.2);
+        let val_c = TensorImpl::fill_with_clone(vec![2, 3], 1.3);
+        let val_d = TensorImpl::fill_with_clone(vec![2, 3], 1.4);
+        let a1 = Node::new(val_a.clone(), None);
+        let b1 = Node::new(val_b.clone(), None);
+        let c1 = Node::new(val_c.clone(), None);
+        let d1 = Node::new(val_d.clone(), None);
+        let ab1 = a1.clone() + b1.clone();
+        let abc1 = ab1.clone() + c1.clone();
+        let abd1 = ab1.clone() + d1.clone();
+        let mut result1 = abc1.clone() + abd1.clone();
+        result1.backward(TensorImpl::fill_with_clone(vec![2, 3], 1.0));
+        let grad_a1 = a1.grad().clone().unwrap();
+        let grad_b1 = b1.grad().clone().unwrap();
+        let grad_c1 = c1.grad().clone().unwrap();
+        let grad_d1 = d1.grad().clone().unwrap();
 
-    //     let a2 = Node::new(val_a, None);
-    //     let b2 = Node::new(val_b, None);
-    //     let c2 = Node::new(val_c, None);
-    //     let d2 = Node::new(val_d, None);
-    //     let mut result2 =
-    //         a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
-    //     result2.backward(1.0);
-    //     let grad_a2 = a2.grad().unwrap();
-    //     let grad_b2 = b2.grad().unwrap();
-    //     let grad_c2 = c2.grad().unwrap();
-    //     let grad_d2 = d2.grad().unwrap();
-    //     assert!(f64::abs(result1.val() - result2.val()) < 1e-10);
-    //     assert!(f64::abs(result1.val() - (2.0 * val_a + 2.0 * val_b + val_c + val_d)) < 1e-10);
-    //     assert_eq!(grad_a1, grad_a2);
-    //     assert_eq!(grad_a1, 2.0);
-    //     assert_eq!(grad_b1, grad_b2);
-    //     assert_eq!(grad_b1, 2.0);
-    //     assert_eq!(grad_c1, grad_c2);
-    //     assert_eq!(grad_c1, 1.0);
-    //     assert_eq!(grad_d1, grad_d2);
-    //     assert_eq!(grad_d1, 1.0);
-    // }
+        let a2 = Node::new(val_a.clone(), None);
+        let b2 = Node::new(val_b.clone(), None);
+        let c2 = Node::new(val_c.clone(), None);
+        let d2 = Node::new(val_d.clone(), None);
+        let mut result2 =
+            a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
+        result2.backward(TensorImpl::fill_with_clone(vec![2, 3], 1.0));
+        let grad_a2 = a2.grad().clone().unwrap();
+        let grad_b2 = b2.grad().clone().unwrap();
+        let grad_c2 = c2.grad().clone().unwrap();
+        let grad_d2 = d2.grad().clone().unwrap();
+        assert!(
+            f64::abs(
+                result1.grad().clone().unwrap().get_data()[0]
+                    - result2.grad().clone().unwrap().get_data()[0]
+            ) < 1e-10
+        );
+        println!(
+            "{}",
+            result1.grad().clone().unwrap().get_data()[0]
+                - (val_a.clone() * 2.0 + val_b.clone() * 2.0 + val_c.clone() + val_d.clone())
+                    .get_data()[0]
+        );
+        assert!(
+            f64::abs(
+                result1.grad().clone().unwrap().get_data()[0]
+                    - (val_a * 2.0 + val_b * 2.0 + val_c + val_d).get_data()[0]
+            ) < 1e-10
+        );
+        assert_eq!(grad_a1, grad_a2);
+        assert_eq!(grad_a1.get_data()[0], 2.0);
+        assert_eq!(grad_b1, grad_b2);
+        assert_eq!(grad_b1.get_data()[0], 2.0);
+        assert_eq!(grad_c1, grad_c2);
+        assert_eq!(grad_c1.get_data()[0], 1.0);
+        assert_eq!(grad_d1, grad_d2);
+        assert_eq!(grad_d1.get_data()[0], 1.0);
+    }
 }

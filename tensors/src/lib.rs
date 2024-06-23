@@ -169,7 +169,7 @@ impl<E: Element> TensorImpl<E> {
                     .iter()
                     .all(|el| *el == 1)
                 {
-                    let mut other_new_shape = vec![1; (dim_diff as usize)];
+                    let mut other_new_shape = vec![1; dim_diff as usize];
                     other_new_shape.extend(other.shape());
                     let mut reshaped_other = other.clone();
                     reshaped_other.reshape(other_new_shape);
@@ -180,7 +180,7 @@ impl<E: Element> TensorImpl<E> {
                     .iter()
                     .all(|el| *el == 1)
                 {
-                    let mut self_new_shape = vec![1; (-dim_diff as usize)];
+                    let mut self_new_shape = vec![1; -dim_diff as usize];
                     self_new_shape.extend(self.shape());
                     let mut reshaped_self = self.clone();
                     reshaped_self.reshape(self_new_shape);
