@@ -1,4 +1,6 @@
 use num::traits::Zero;
+use std::cell::Ref;
+use std::ops::MulAssign;
 use std::{
     cmp::{PartialEq, PartialOrd},
     error::Error,
@@ -20,19 +22,28 @@ impl AsAnyhowError for AsStdError {}
 /// The element type must be an implementer of `Element`.
 pub trait Tensor<E>:
     Debug
-    + PartialEq
+    // + PartialEq
     + Clone
     //+ Sized
-    + IntoIterator<Item = E>
+    + IntoIterator<Item = E, IntoIter = std::vec::IntoIter<E>>
     + Add<Output = Self>
     + Sub<Output = Self>
     + Add<E, Output = Self>
+    + for<'a> Add<&'a Self, Output = Self>
+    + AddAssign
+    + for<'a> AddAssign<&'a Self>
     + Sub<E, Output = Self>
     + Mul<Output = Self>
+    + MulAssign
+    + for<'a> MulAssign<&'a Self>
+    + MulAssign<E>
+    + for<'a> Mul<&'a Self, Output = Self>
     + Mul<E, Output = Self>
     + Div<E, Output = Self>
+    + for<'a> Div<&'a Self, Output = Self>
     + Div<Output = Self>
     + Into<Vec<E>>
+    + Zero
 where
     E: Element,
 {
@@ -109,7 +120,7 @@ where
 // }
 
 /// A Subtrait of `Element`, extending the trait to capture "real number like" behaviour.
-pub trait RealElement: Element + Exp + Pow + Ln + From<f64> + PartialOrd {
+pub trait RealElement: Element + Exp + Pow + Ln + From<f64> {
     fn neg_inf() -> Self;
 }
 

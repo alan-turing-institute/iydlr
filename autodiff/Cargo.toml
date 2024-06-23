@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-interfaces = { path = "../interfaces"}
+interfaces = { path = "../interfaces" }
+tensors = { path = "../tensors" }
 num-traits = "0.2.19"

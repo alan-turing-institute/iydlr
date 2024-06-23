@@ -14,7 +14,7 @@ where
     /// support forwarding an n-dimensional `x` (eg. a "batch").
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError>;
 
-    fn params(&self) -> Vec<E>;
+    fn params(&self) -> Vec<T>;
 }
 
 /// A convenince-only Subtrait of `DLModule` to specifiy a module that does linear transformation.

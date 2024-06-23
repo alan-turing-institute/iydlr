@@ -29,6 +29,7 @@ where
         if input_shape.len() > 2 {
             let mut new_shape = vec![1];
             new_shape.extend(b.shape());
+            // println!("old bias shape: {:?}", b.shape());
             // println!("New bias shape: {:?}", new_shape);
             b.reshape(new_shape);
             // println!("Reshaped bias: {:?}", b.shape());
@@ -36,10 +37,8 @@ where
         Ok(x.clone().matmul(&self.w.clone())? + b)
     }
 
-    fn params(&self) -> Vec<E> {
-        let mut res: Vec<E> = self.w.clone().into();
-        res.extend(self.b.clone().into());
-        res
+    fn params(&self) -> Vec<T> {
+        vec![self.w.clone(), self.b.clone()]
     }
 }
 
@@ -78,7 +77,7 @@ where
                 }
             });
 
-        let weights = T::from_vec(&vec![i_size, o_size], &w_data)
+        let weights = T::from_vec(&vec![1, i_size, o_size], &w_data)
             .expect("Ensured data can be arranged into a matrix of the given size.");
         // let bias = T::from_vec(&vec![1_usize, 1_usize, o_size], &b_data)
         let bias = T::from_vec(&vec![1_usize, o_size], &b_data)

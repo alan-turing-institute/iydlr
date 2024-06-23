@@ -26,7 +26,7 @@ where
         Ok(tmp.clone())
     }
 
-    fn params(&self) -> Vec<E> {
+    fn params(&self) -> Vec<T> {
         self.modules.iter().fold(Vec::new(), |mut acc, module| {
             acc.extend(module.params());
             acc

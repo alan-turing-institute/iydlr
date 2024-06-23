@@ -1,5 +1,8 @@
+use std::ops::Deref;
+
 use autodiff::node::Node;
 use interfaces::tensors::{RealElement, RealTensor};
+use tensors::TensorImpl;
 
 pub struct OptimSGD<T> {
     l_rate: f64,
@@ -17,10 +20,10 @@ impl<T> OptimSGD<T> {
     }
 }
 
-impl OptimSGD<Node<f64>> {
+impl OptimSGD<Node<TensorImpl<f64>>> {
     pub fn zero_grad(&mut self) {
         for p in self.params.iter_mut() {
-            p.set_grad(0.0)
+            p.set_grad(0.0.into())
         }
     }
 
@@ -31,7 +34,8 @@ impl OptimSGD<Node<f64>> {
         }
         for p in self.params.iter_mut() {
             // println!("{:?}", p.grad());
-            p.set_val(p.val() + (-l_rate * p.grad().unwrap()))
+            let new_grad = (p.grad().clone().unwrap() * -l_rate) + p.val().deref();
+            p.set_val(new_grad)
         }
     }
 }
@@ -55,6 +59,7 @@ where
 {
     // -1 * [ y * (y_pred + 0.0001).ln()    +    (1 - y) * (1 - (y_pred - 0.0001)).ln() ]
     let t_ones = T::fill_with_clone(y.shape(), E::from(1.0));
+    
     T::fill_with_clone(y.shape(), E::from(-1.0))
         * (y.clone() * (y_pred.clone() + E::from(0.0000001)).ln()
             + (t_ones.clone() + (y * E::from(-1.0)))

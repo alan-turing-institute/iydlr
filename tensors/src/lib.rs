@@ -1,11 +1,16 @@
 use anyhow::Error;
 use interfaces::tensors::{AsStdError, Element, RealElement, RealTensor, Tensor};
 use interfaces::utils::{Exp, Ln, Pow};
+use num_traits::Zero;
+use std::cell::Ref;
+use std::fmt::Display;
+use std::ops::{AddAssign, MulAssign};
 use std::{
     fmt::Debug,
     ops::{Add, Div, Mul, Sub},
     vec::Vec,
 };
+pub mod f64_tensor;
 
 /// Implementation of multidimensional arrays as row major strided vectors.
 #[derive(Debug, Clone, PartialEq)]
@@ -64,8 +69,21 @@ impl<E: Element> TensorImpl<E> {
                 Error::msg("The first tensor int matmul must have at least 2 dimensions").into(),
             );
         }
+        let mut reshaped_other = other.clone();
         if other_num_dims != 2 {
-            return Err(Error::msg("The second tensor int matmul must have 2 dimensions").into());
+            if other_num_dims > 2 {
+                if other.shape()[0..(other_num_dims - 2)]
+                    .iter()
+                    .all(|el| *el == 1)
+                {
+                    reshaped_other.reshape(other.shape()[(other_num_dims - 2)..].to_vec());
+                    return self.matmul_transpose(&reshaped_other);
+                }
+            } else {
+                return Err(
+                    Error::msg("The second tensor int matmul must have 2 dimensions").into(),
+                );
+            }
         }
         let dim1 = self.shape[self_num_dims - 2];
         let dim_inner = self.shape[self_num_dims - 1];
@@ -123,8 +141,7 @@ impl<E: Element> TensorImpl<E> {
         });
     }
 
-
-    pub fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
+    pub fn elementwise_binary_op(&self, other: &Self, op: fn(E, E) -> E) -> Self {
         if self.shape() == other.shape() {
             return self.elementwise_binary_op_same_shape(other, op);
         } else {
@@ -132,7 +149,7 @@ impl<E: Element> TensorImpl<E> {
         }
     }
 
-    fn elementwise_binary_op_same_shape(self, other: Self, op: fn(E, E) -> E) -> Self {
+    fn elementwise_binary_op_same_shape(&self, other: &Self, op: fn(E, E) -> E) -> Self {
         let data: Vec<E> = self
             .data
             .iter()
@@ -144,8 +161,32 @@ impl<E: Element> TensorImpl<E> {
         TensorImpl::from_vec(&self.shape(), &data).unwrap()
     }
 
-    fn elementwise_binary_op_broadcast(self, other: Self, op: fn(E, E) -> E) -> Self {
-        if self.num_dims() != other.num_dims() {
+    fn elementwise_binary_op_broadcast(&self, other: &Self, op: fn(E, E) -> E) -> Self {
+        let dim_diff: i32 = self.num_dims() as i32 - other.num_dims() as i32;
+        if dim_diff != 0 {
+            if dim_diff > 0 {
+                if self.shape()[0..(dim_diff as usize)]
+                    .iter()
+                    .all(|el| *el == 1)
+                {
+                    let mut other_new_shape = vec![1; (dim_diff as usize)];
+                    other_new_shape.extend(other.shape());
+                    let mut reshaped_other = other.clone();
+                    reshaped_other.reshape(other_new_shape);
+                    return self.elementwise_binary_op_broadcast(&reshaped_other, op);
+                }
+            } else {
+                if other.shape()[0..(-dim_diff as usize)]
+                    .iter()
+                    .all(|el| *el == 1)
+                {
+                    let mut self_new_shape = vec![1; (-dim_diff as usize)];
+                    self_new_shape.extend(self.shape());
+                    let mut reshaped_self = self.clone();
+                    reshaped_self.reshape(self_new_shape);
+                    return reshaped_self.elementwise_binary_op_broadcast(other, op);
+                }
+            }
             panic!("Shapes are not compatible for element-wise operations.");
         }
         let num_dims = self.num_dims();
@@ -224,7 +265,27 @@ impl<E: Element> Add for TensorImpl<E> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
+        self.elementwise_binary_op(&other, |a, b| a + b)
+    }
+}
+
+impl<E: Element> Add<&Self> for TensorImpl<E> {
+    type Output = Self;
+
+    fn add(self, other: &Self) -> Self {
         self.elementwise_binary_op(other, |a, b| a + b)
+    }
+}
+
+impl<E: Element> AddAssign for TensorImpl<E> {
+    fn add_assign(&mut self, other: Self) {
+        *self = self.elementwise_binary_op(&other, |a, b| a + b)
+    }
+}
+
+impl<E: Element> AddAssign<&Self> for TensorImpl<E> {
+    fn add_assign(&mut self, other: &Self) {
+        *self = self.elementwise_binary_op(other, |a, b| a + b)
     }
 }
 
@@ -233,6 +294,14 @@ impl<E: Element> Div for TensorImpl<E> {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
+        self.elementwise_binary_op(&other, |a, b| a / b)
+    }
+}
+
+impl<E: Element> Div<&Self> for TensorImpl<E> {
+    type Output = Self;
+
+    fn div(self, other: &Self) -> Self {
         self.elementwise_binary_op(other, |a, b| a / b)
     }
 }
@@ -242,7 +311,28 @@ impl<E: Element> Mul for TensorImpl<E> {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self {
+        self.elementwise_binary_op(&other, |a, b| a * b)
+    }
+}
+
+/// Multiplying to two tensors elementwise.
+impl<E: Element> Mul<&Self> for TensorImpl<E> {
+    type Output = Self;
+
+    fn mul(self, other: &Self) -> Self {
         self.elementwise_binary_op(other, |a, b| a * b)
+    }
+}
+
+impl<E: Element> MulAssign for TensorImpl<E> {
+    fn mul_assign(&mut self, other: Self) {
+        *self = self.elementwise_binary_op(&other, |a, b| a * b)
+    }
+}
+
+impl<E: Element> MulAssign<&Self> for TensorImpl<E> {
+    fn mul_assign(&mut self, other: &Self) {
+        *self = self.elementwise_binary_op(other, |a, b| a * b)
     }
 }
 
@@ -251,7 +341,7 @@ impl<E: Element + Sub<Output = E>> Sub for TensorImpl<E> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        self.elementwise_binary_op(other, |a, b| a - b)
+        self.elementwise_binary_op(&other, |a, b| a - b)
     }
 }
 
@@ -300,6 +390,14 @@ impl<E: Element> Mul<E> for TensorImpl<E> {
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
         TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+}
+
+impl<E: Element> MulAssign<E> for TensorImpl<E> {
+    fn mul_assign(&mut self, scalar: E) {
+        for el in self.data.iter_mut() {
+            *el = el.clone() * scalar.clone()
+        }
     }
 }
 
@@ -493,7 +591,6 @@ where
         self.data.as_ref()
     }
 
-
     // TODO (asmith) There is loads of copy-and-paste code from the
     // `single_dim_sum` method. Ideally this should be refactored
     pub fn slice(&self, dim: usize, idx: usize) -> Result<Self, &str> {
@@ -504,7 +601,6 @@ where
         if idx >= self.shape[dim] {
             return Err("The provided index is out of bounds.");
         }
-
 
         let leading_dims = self.shape.iter().take(dim).into_iter().product::<usize>();
         let trailing_dims = self
@@ -520,7 +616,6 @@ where
 
         let mut output_shape = self.shape.clone();
         output_shape[dim] = 1;
-
 
         let mut slice: Vec<E> = Vec::new();
 
@@ -541,7 +636,6 @@ where
         // println!("output_shape: {:?}", output_shape);
         // println!("slice: {:?}", slice);
         Ok(TensorImpl::from_vec(&output_shape, &slice).unwrap())
-
     }
 
     ///// Sum across a single dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
@@ -624,11 +718,9 @@ impl<E: RealElement> Ln for TensorImpl<E> {
 impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
         let t_small = E::from(f64::EPSILON);
-        let max = self.data.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let data_exp = (self.clone() - max.clone()).exp();
-        let data_sum = data_exp.dim_sum(vec![dim]);
-
-        let new_data = data_exp / (data_sum + t_small);
+        let data_exp = self.clone().exp();
+        let sum = data_exp.dim_sum(vec![dim]);
+        let new_data = data_exp / (sum + t_small);
         TensorImpl {
             shape: self.shape.clone(),
             data: new_data.data,
@@ -637,6 +729,27 @@ impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
 
     fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
         todo!()
+    }
+}
+
+impl<E> Display for TensorImpl<E>
+where
+    E: RealElement,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "shape: ({:?})\n{:?}", self.shape(), self.get_data())
+    }
+}
+
+impl<E: Element> Zero for TensorImpl<E> {
+    fn is_zero(&self) -> bool {
+        self.data.iter().all(|el| el.is_zero())
+    }
+    fn set_zero(&mut self) {
+        *self *= E::zero()
+    }
+    fn zero() -> Self {
+        Self::from_vec(&vec![1], &vec![E::zero()]).unwrap()
     }
 }
 
@@ -1014,10 +1127,13 @@ mod tests {
             let shape = vec![2, 2];
             let data = vec![1, 2, 3, 4];
             let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
-    
+
             let slice = tensor.slice(5, 1);
             assert!(slice.is_err());
-            assert_eq!(slice.err(), Some("The provided dimension is out of bounds."));
+            assert_eq!(
+                slice.err(),
+                Some("The provided dimension is out of bounds.")
+            );
         }
 
         // Test idx is too large
@@ -1025,7 +1141,7 @@ mod tests {
             let shape = vec![2, 2];
             let data = vec![1, 2, 3, 4];
             let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
-    
+
             let slice = tensor.slice(1, 5);
             assert!(slice.is_err());
             assert_eq!(slice.err(), Some("The provided index is out of bounds."));
@@ -1036,7 +1152,7 @@ mod tests {
         let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
-        let maybe_slice = tensor.slice(2,1);
+        let maybe_slice = tensor.slice(2, 1);
         let expected_shape = vec![2, 2, 1];
         let expected_data = vec![2, 4, 6, 8];
 
