@@ -1078,15 +1078,9 @@ mod tests {
                     - result2.grad().clone().unwrap().get_data()[0]
             ) < 1e-10
         );
-        println!(
-            "{}",
-            result1.grad().clone().unwrap().get_data()[0]
-                - (val_a.clone() * 2.0 + val_b.clone() * 2.0 + val_c.clone() + val_d.clone())
-                    .get_data()[0]
-        );
         assert!(
             f64::abs(
-                result1.grad().clone().unwrap().get_data()[0]
+                result1.val().get_data()[0]
                     - (val_a * 2.0 + val_b * 2.0 + val_c + val_d).get_data()[0]
             ) < 1e-10
         );
