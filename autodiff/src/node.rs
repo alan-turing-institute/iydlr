@@ -84,59 +84,47 @@ impl<T: RealTensor<f64> + From<f64>> Node<T> {
         let self_val = self.val().clone();
         // println!("backward: {:?}", self.shape());
 
+        fn backward_broadcast<T: RealTensor<f64> + From<f64>>(grad: T, np: Node<T>) -> T {
+            let grad_shape = grad.shape();
+            let np_shape = np.shape();
+
+            if np_shape != grad_shape {
+                for (dim_idx, (grad_dim, np_dim)) in
+                    zip(grad_shape.iter(), np_shape.iter()).enumerate()
+                {
+                    if grad_dim != np_dim {
+                        assert!(
+                            grad_dim > np_dim,
+                            "broadcasting should only increase the dimensionality"
+                        );
+                        return grad.dim_sum(vec![dim_idx]);
+                    }
+                }
+            }
+            grad
+        }
+
         match *self.ptr.borrow_mut() {
             NodeContent::Sum(_, _, (ref mut np1, ref mut np2)) => {
                 // println!("SUM");
-                let grad_shape = grad.shape();
-                let np1_shape = np1.shape();
-                let np2_shape = np2.shape();
-
-                if np1_shape != grad_shape {
-                    for (dim_idx, (grad_dim, np1_dim)) in
-                        zip(grad_shape.iter(), np1_shape.iter()).enumerate()
-                    {
-                        if grad_dim != np1_dim {
-                            assert!(
-                                grad_dim > np1_dim,
-                                "broadcasting should only increase the dimensionality"
-                            );
-                            np1.backward(grad.dim_sum(vec![dim_idx]));
-                        }
-                    }
-                } else {
-                    np1.backward(grad.clone());
-                }
-                if np2_shape != grad_shape {
-                    for (dim_idx, (grad_dim, np2_dim)) in zip(grad_shape, np2_shape).enumerate() {
-                        if grad_dim != np2_dim {
-                            assert!(
-                                grad_dim > np2_dim,
-                                "broadcasting should only increase the dimensionality"
-                            );
-                            np2.backward(grad.dim_sum(vec![dim_idx]));
-                        }
-                    }
-                } else {
-                    np2.backward(grad.clone());
-                }
+                np1.backward(backward_broadcast(grad.clone(), np1.clone()));
+                np2.backward(backward_broadcast(grad.clone(), np2.clone()));
             }
             NodeContent::Prod(_, _, (ref mut np1, ref mut np2)) => {
                 // println!("PROD");
                 let np1_grad = grad.clone() * np2.val().deref();
                 let np2_grad = grad.clone() * np1.val().deref();
-                np1.backward(np1_grad);
-                np2.backward(np2_grad);
+                np1.backward(backward_broadcast(np1_grad, np1.clone()));
+                np2.backward(backward_broadcast(np2_grad, np2.clone()));
             }
             NodeContent::Quot(_, _, (ref mut np_num, ref mut np_denom)) => {
-                let minus_one = <f64 as Into<T>>::into(-1_f64);
-
                 let np_num_grad = grad.clone() / np_denom.val().to_owned();
 
                 let np_denom_grad = grad.clone() * -1_f64 * np_num.val().to_owned()
                     / np_denom.val().to_owned().pow(2_f64);
 
-                np_num.backward(np_num_grad);
-                np_denom.backward(np_denom_grad);
+                np_num.backward(backward_broadcast(np_num_grad, np_num.clone()));
+                np_denom.backward(backward_broadcast(np_denom_grad, np_denom.clone()));
             }
             NodeContent::Exp(_, _, ref mut np) => {
                 // println!("EXP");
@@ -188,16 +176,22 @@ impl<T: RealTensor<f64> + From<f64>> Node<T> {
             }
             NodeContent::DimSum(_, _, ref mut np1, ref mut dim, ref mut old_shape) => {
                 // println!("DIMSUM");
-                let reshaped_grad = grad.clone();
-                for _ in 0..old_shape[*dim] {
-                    reshaped_grad.concat(&reshaped_grad, *dim);
+                let mut reshaped_grad = grad.clone();
+                for _ in 0..(old_shape[*dim] - 1) {
+                    reshaped_grad = reshaped_grad.concat(&grad, *dim).unwrap();
                 }
-                np1.backward(reshaped_grad)
+                np1.backward(reshaped_grad);
             }
             NodeContent::Leaf(_, _) => {} // Do nothing.
         }
-        // println!("self shape: {:?}", self.shape());
-        // println!("grad shape: {:?}", grad.shape());
+        // if self.shape() != grad.shape() {
+        //     println!(
+        //         "self shape, grad shape: {:?}, {:?}",
+        //         self.shape(),
+        //         grad.shape()
+        //     );
+        // }
+
         self.add_assign_grad(grad);
     }
 }
@@ -1092,5 +1086,170 @@ mod tests {
         assert_eq!(grad_c1.get_data()[0], 1.0);
         assert_eq!(grad_d1, grad_d2);
         assert_eq!(grad_d1.get_data()[0], 1.0);
+    }
+
+    #[test]
+    fn test_broadcast_add() {
+        let a = Node::new(
+            TensorImpl::from_vec(
+                &vec![2, 2, 3],
+                &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            )
+            .unwrap(),
+            None,
+        );
+        let b = Node::new(
+            TensorImpl::from_vec(&vec![1, 2, 3], &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap(),
+            None,
+        );
+        let mut c = a.clone() + b.clone();
+        c.backward(TensorImpl::fill_with_clone(vec![2, 2, 3], 1.0));
+        assert_eq!(
+            TensorImpl::fill_with_clone(vec![1, 2, 3], 2.0),
+            b.clone().grad().clone().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_broadcast_mul() {
+        let a = Node::new(
+            TensorImpl::from_vec(
+                &vec![2, 2, 3],
+                &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            )
+            .unwrap(),
+            None,
+        );
+        let b = Node::new(
+            TensorImpl::from_vec(&vec![1, 2, 3], &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap(),
+            None,
+        );
+        let mut c = a.clone() * b.clone();
+        c.backward(TensorImpl::fill_with_clone(vec![2, 2, 3], 1.0));
+        assert_eq!(
+            TensorImpl::from_vec(&vec![1, 2, 3], &vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]).unwrap(),
+            b.clone().grad().clone().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_broadcast_div() {
+        let a = Node::new(
+            TensorImpl::from_vec(
+                &vec![2, 2, 3],
+                &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            )
+            .unwrap(),
+            None,
+        );
+        let b = Node::new(
+            TensorImpl::from_vec(&vec![1, 2, 3], &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap(),
+            None,
+        );
+        let mut c = a.clone() / b.clone();
+        c.backward(TensorImpl::fill_with_clone(vec![2, 2, 3], 1.0));
+        assert_eq!(
+            TensorImpl::from_vec(
+                &vec![1, 2, 3],
+                &vec![
+                    -2.0,
+                    -1.0,
+                    -0.6666666666666666,
+                    -0.5,
+                    -0.4,
+                    -0.3333333333333333
+                ]
+            )
+            .unwrap(),
+            b.clone().grad().clone().unwrap()
+        );
+        assert_eq!(
+            TensorImpl::from_vec(
+                &vec![2, 2, 3],
+                &vec![
+                    1.0000,
+                    0.5000,
+                    0.3333333333333333,
+                    0.2500,
+                    0.2000,
+                    0.16666666666666666,
+                    1.0000,
+                    0.5000,
+                    0.3333333333333333,
+                    0.2500,
+                    0.2000,
+                    0.16666666666666666
+                ]
+            )
+            .unwrap(),
+            a.clone().grad().clone().unwrap()
+        );
+    }
+
+    #[test]
+    fn test_matmul() {
+        let a = Node::new(
+            TensorImpl::from_vec(&vec![2, 3], &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap(),
+            None,
+        );
+        let b = Node::new(
+            TensorImpl::from_vec(&vec![3, 2], &vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap(),
+            None,
+        );
+        let mut c = a.matmul(&b).unwrap();
+        c.backward(TensorImpl::fill_with_clone(vec![2, 2], 1.0));
+        assert_eq!(
+            a.clone().grad().clone().unwrap(),
+            TensorImpl::from_vec(&vec![2, 3], &vec![3.0, 7.0, 11.0, 3.0, 7.0, 11.0]).unwrap()
+        );
+        assert_eq!(
+            b.clone().grad().clone().unwrap(),
+            TensorImpl::from_vec(&vec![3, 2], &vec![5.0, 5.0, 7.0, 7.0, 9.0, 9.0]).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_softmax() {
+        let a = Node::new(
+            TensorImpl::from_vec(&vec![2, 3], &vec![2.2, 2.3, 2.3, 2.6, 2.1, 2.0]).unwrap(),
+            None,
+        );
+        let b = Node::new(
+            TensorImpl::from_vec(
+                &vec![3, 3],
+                &vec![1.0, 2.0, 3.0, 3.0, 4.0, 3.0, 5.0, 6.0, 3.0],
+            )
+            .unwrap(),
+            None,
+        );
+        // let c = a.clone() + b;
+        let mut soft = a.softmax(0);
+        // println!("{:?}", soft.clone().val());
+
+        soft.backward(TensorImpl::fill_with_clone(soft.shape(), 1.0));
+        println!("{:?}", a.clone().grad())
+    }
+
+    #[test]
+    fn test_nn() {
+        let a = Node::new(
+            TensorImpl::from_vec(&vec![2, 3], &vec![2.2, 2.3, 2.3, 2.6, 2.1, 2.0]).unwrap(),
+            None,
+        );
+        let b = Node::new(
+            TensorImpl::from_vec(
+                &vec![3, 3],
+                &vec![1.0, 2.0, 3.0, 3.0, 4.0, 3.0, 5.0, 6.0, 3.0],
+            )
+            .unwrap(),
+            None,
+        );
+        let c = a.matmul(&b).unwrap();
+        let d = c.clone() + a.clone();
+        let mut soft = d.softmax(0);
+        // println!("{:?}", soft.clone().val());
+
+        soft.backward(TensorImpl::fill_with_clone(soft.shape(), 1.0));
+        println!("{:?}", a.clone().grad())
     }
 }

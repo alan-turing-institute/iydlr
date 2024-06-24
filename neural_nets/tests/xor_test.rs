@@ -12,6 +12,29 @@ use neural_nets::{
 use tensors::TensorImpl;
 
 #[test]
+fn nn_test() {
+    let seed = 0;
+    let model = Serial::<Node<TensorImpl<f64>>, f64>::new(vec![
+        Box::new(LinLayer::new(2, 5, seed)),
+        Box::new(ActLayer::new()),
+    ]);
+    let params = model.params();
+    let x = TensorImpl::from_vec(&vec![1, 1, 2], &vec![2.0, 3.0]).unwrap();
+    let mut pred = model.forward(&x.into()).unwrap();
+    println!("\npred: {:?}\n", pred.val());
+    pred.backward(TensorImpl::fill_with_clone(pred.shape(), 1.0));
+
+    assert_eq!(
+        params[0].clone().grad().clone().unwrap().get_data(),
+        &vec![2., 2., 2., 2., 0., 3., 3., 3., 3., 0.]
+    );
+    assert_eq!(
+        params[1].clone().grad().clone().unwrap().get_data(),
+        &vec![1., 1., 1., 1., 0.]
+    );
+}
+
+#[test]
 fn xor_test() {
     let seed = 2;
     let max_itr = 300;
