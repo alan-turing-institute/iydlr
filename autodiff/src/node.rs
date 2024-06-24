@@ -82,7 +82,6 @@ impl<T: RealTensor<f64> + From<f64>> Node<T> {
     // Assumes the `grad` on self is not None.
     pub fn backward(&mut self, grad: T) {
         let self_val = self.val().clone();
-        // println!("backward: {:?}", self.shape());
 
         fn backward_broadcast<T: RealTensor<f64> + From<f64>>(grad: T, np: Node<T>) -> T {
             let grad_shape = grad.shape();
@@ -152,10 +151,6 @@ impl<T: RealTensor<f64> + From<f64>> Node<T> {
             }
             NodeContent::Matmul(_, _, (ref mut np1, ref mut np2)) => {
                 // println!("MATMUL");
-                // println!("grad: {:?}", grad);
-                // println!("grad shape: {:?}", grad.shape());
-                // println!("np1.transpose shape: {:?}", np1.transpose().shape());
-                // println!("np2 shape: {:?}", np2.shape());
                 let np1_grad = grad.clone().matmul(&np2.val().deref().transpose()).unwrap();
                 let np2_grad = np1.val().deref().transpose().matmul(&grad).unwrap();
                 np1.backward(np1_grad);
@@ -168,8 +163,6 @@ impl<T: RealTensor<f64> + From<f64>> Node<T> {
 
             NodeContent::Reshape(_, _, ref mut np1, ref mut old_shape) => {
                 // println!("RESHAPE");
-                // println!("old_shape: {:?}", old_shape);
-                // println!("grad_shape: {:?}", grad.shape());
                 let mut reshaped_grad = grad.clone();
                 reshaped_grad.reshape(old_shape.clone());
                 np1.backward(reshaped_grad)
@@ -184,13 +177,6 @@ impl<T: RealTensor<f64> + From<f64>> Node<T> {
             }
             NodeContent::Leaf(_, _) => {} // Do nothing.
         }
-        // if self.shape() != grad.shape() {
-        //     println!(
-        //         "self shape, grad shape: {:?}, {:?}",
-        //         self.shape(),
-        //         grad.shape()
-        //     );
-        // }
 
         self.add_assign_grad(grad);
     }
