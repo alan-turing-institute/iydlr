@@ -3,10 +3,7 @@ use interfaces::{
     deep_learning::{DLModule, LinearLayer},
     tensors::{Element, RealElement, RealTensor, Tensor},
 };
-use std::iter::Iterator;
 use std::marker::PhantomData;
-
-use crate::lin_layer::LinLayer;
 
 pub struct NormLayer<T: Tensor<E>, E: Element> {
     tensor_phantom: PhantomData<T>,

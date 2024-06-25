@@ -1,19 +1,13 @@
-use interfaces::tensors::{AsAnyhowError, RealTensor, Tensor};
-use interfaces::{
-    tensors::{Element, RealElement},
-    utils::{Exp, Ln, Pow},
-};
-use num_traits::{Inv, Zero};
-use std::any::Any;
+use interfaces::tensors::{RealTensor, Tensor};
+use interfaces::utils::{Exp, Ln, Pow};
+use num_traits::Zero;
 use std::cell::{Ref, RefMut};
-use std::error::Error;
 use std::iter::zip;
 use std::ops::MulAssign;
 use std::{
     cell::RefCell,
-    cmp::{Ordering, PartialOrd},
     fmt::Display,
-    ops::{Add, AddAssign, Deref, DerefMut, Div, Mul, Sub},
+    ops::{Add, AddAssign, Deref, Div, Mul, Sub},
     rc::Rc,
 };
 use tensors::TensorImpl;
@@ -582,13 +576,13 @@ where
 {
     type TensorError = <T as Tensor<f64>>::TensorError;
 
-    fn at(&self, idxs: Vec<usize>) -> Option<&f64> {
+    fn at(&self, _idxs: Vec<usize>) -> Option<&f64> {
         todo!()
     }
-    fn at_mut(&mut self, idxs: Vec<usize>) -> Option<&mut f64> {
+    fn at_mut(&mut self, _idxs: Vec<usize>) -> Option<&mut f64> {
         todo!()
     }
-    fn concat(&self, other: &Self, dim: usize) -> Result<Self, Self::TensorError> {
+    fn concat(&self, _other: &Self, _dim: usize) -> Result<Self, Self::TensorError> {
         todo!()
     }
     fn dim_sum(&self, dims: Vec<usize>) -> Self {
@@ -632,7 +626,7 @@ impl<T> RealTensor<f64> for Node<T>
 where
     T: RealTensor<f64> + From<f64>,
 {
-    fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
+    fn fill_from_f64(_shape: Vec<usize>, _data: f64) -> Self {
         todo!()
     }
 

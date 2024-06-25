@@ -3,7 +3,6 @@ use interfaces::{
     tensors::{Element, RealElement, Tensor},
     utils::Pow,
 };
-use num_traits::identities::Zero;
 
 impl From<f64> for TensorImpl<f64> {
     fn from(value: f64) -> Self {

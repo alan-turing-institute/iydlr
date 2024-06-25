@@ -1,9 +1,7 @@
 use num::traits::Zero;
-use std::cell::Ref;
 use std::ops::MulAssign;
 use std::{
-    cmp::{PartialEq, PartialOrd},
-    error::Error,
+    cmp::PartialEq,
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul, Sub},
 };

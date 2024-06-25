@@ -2,7 +2,6 @@ use anyhow::Error;
 use interfaces::tensors::{AsStdError, Element, RealElement, RealTensor, Tensor};
 use interfaces::utils::{Exp, Ln, Pow};
 use num_traits::Zero;
-use std::cell::Ref;
 use std::fmt::Display;
 use std::ops::{AddAssign, MulAssign};
 use std::{
@@ -571,8 +570,8 @@ where
     // TODO(mhauru) This should return something like a view, which references the same data but is
     // a new object. I don't know how to do that though.
     fn reshape(&mut self, new_shape: Vec<usize>) {
-        let num_els = self.num_elements();
-        let new_num_els = num_elements_from_shape(&new_shape);
+        // let num_els = self.num_elements();
+        // let new_num_els = num_elements_from_shape(&new_shape);
         // println!("Num els {}", num_els);
         // println!("New num els{}", new_num_els);
         // println!("Shape: {:?}", self.shape());
@@ -655,7 +654,7 @@ where
 
         let mut output_shape = self.shape.clone();
         output_shape[dim] = 1;
-        let output_size = output_shape.iter().product::<usize>();
+        // let output_size = output_shape.iter().product::<usize>();
 
         let mut dim_sum: Vec<E> = Vec::new();
 
@@ -727,7 +726,7 @@ impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
         }
     }
 
-    fn fill_from_f64(shape: Vec<usize>, data: f64) -> Self {
+    fn fill_from_f64(_shape: Vec<usize>, _data: f64) -> Self {
         todo!()
     }
 }
