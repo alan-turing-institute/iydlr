@@ -54,7 +54,8 @@ impl BatchGenerator {
                 // one_hot_x[x_token] = Node::from(1.0);
                 one_hot_y[y_token] = Node::from(1.0);
                 x_tensor.push(Node::from(x_token));
-                y_tensor.extend(one_hot_y);
+                // y_tensor.extend(one_hot_y);
+                y_tensor.push(Node::from(y_token));
             }
         }
 
@@ -65,7 +66,8 @@ impl BatchGenerator {
         )
         .unwrap();
         let y = TensorImpl::from_vec(
-            &vec![self.batch_size, self.chunk_len, self.vocab_size],
+            // &vec![self.batch_size, self.chunk_len, self.vocab_size],
+            &vec![self.batch_size, self.chunk_len, 1],
             &y_tensor,
         )
         .unwrap();
@@ -81,6 +83,13 @@ pub struct TrainingExample {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sanity_check() {
+        let tokeniser = Tokeniser::new("hellotransformer");
+        let mut batch_gen = BatchGenerator::new("hellotransformer".to_string(), 2, 1, 0);
+        batch_gen.sample_batch();
+    }
 
     #[test]
     fn generate_sample() {

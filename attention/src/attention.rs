@@ -129,33 +129,33 @@ where
                 let query = self.query_weights[attention_head_idx]
                     .forward(&single_batch_tensor)
                     .unwrap(); // just a matmul, Unwrap used since we currently do not have conversion implemented
-                println!("Data shape: {:?}", x.shape());
-                println!("Single batch shape: {:?}", single_batch_tensor.shape());
+                               // println!("Data shape: {:?}", x.shape());
+                               // println!("Single batch shape: {:?}", single_batch_tensor.shape());
                 let key: T = self.key_weights[attention_head_idx]
                     .forward(&single_batch_tensor)
                     .unwrap(); // B x T x d_k (C / num_heads)
-                println!("Key shape: {:?}", key.shape());
-                println!("Query shape: {:?}", query.shape());
+                               // println!("Key shape: {:?}", key.shape());
+                               // println!("Query shape: {:?}", query.shape());
                 let value: T = self.value_weights[attention_head_idx]
                     .forward(&single_batch_tensor)
                     .unwrap();
                 let last_dim_of_keys = *key.shape().last().unwrap(); // d_k
-                println!("Value shape: {:?}", value.shape());
-                // make sure only last two dimensions are transposed
+                                                                     // println!("Value shape: {:?}", value.shape());
+                                                                     // make sure only last two dimensions are transposed
                 let att: T = query.matmul(&key.transpose()).unwrap() *
                     // TODO: make this safer
                     E::from((last_dim_of_keys as f64).powf(-0.5));
-                println!("Att (pre-mask) shape: {:?}", att.shape());
+                // println!("Att (pre-mask) shape: {:?}", att.shape());
 
                 // softmax along the sequence length, TODO: check correct dim for softmax
                 // TODO: mask currently not working with shape
                 let att: T = if let Some(mask) = &self.mask {
                     // println!("Single element tensor: {:?}", single_batch_tensor.shape());
                     // element-wise multiplication on attention: (T x T)  x (T x T)
-                    println!("Mask shape: {:?}", mask.shape());
-                    println!("Attention shape: {:?}", att.shape());
+                    // println!("Mask shape: {:?}", mask.shape());
+                    // println!("Attention shape: {:?}", att.shape());
                     let masked_att: T = mask.clone() + att.clone();
-                    println!("Masked att shape: {:?}", masked_att.shape());
+                    // println!("Masked att shape: {:?}", masked_att.shape());
                     masked_att
                 } else {
                     att
@@ -181,14 +181,14 @@ where
             // Reshape att_v to value
             outputs.push(value)
         }
-        println!("Single head (shape) {:?}: ", outputs[0].shape());
+        // println!("Single head (shape) {:?}: ", outputs[0].shape());
         // Concatanate over heads
         // TODO: check concat is channel-wise
         let reshaped_outputs = outputs
             .into_iter()
             .reduce(|acc, x| acc.concat(&x, acc.shape().len() - 1).unwrap())
             .unwrap();
-        println!("Reshaped outputs {:?}: ", reshaped_outputs.shape());
+        // println!("Reshaped outputs {:?}: ", reshaped_outputs.shape());
         Ok(reshaped_outputs)
     }
 

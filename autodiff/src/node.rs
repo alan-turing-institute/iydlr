@@ -1,6 +1,6 @@
 use std::{
-    cmp::{PartialOrd, Ordering},
     cell::RefCell,
+    cmp::{Ordering, PartialOrd},
     fmt::Display,
     ops::{Add, AddAssign, Deref, DerefMut, Div, Mul, Sub},
     rc::Rc,
@@ -39,14 +39,16 @@ impl<T: RealElement + From<f64>> Node<T> {
     }
 
     pub fn val(&self) -> T {
-        self.ptr.deref().borrow().val().clone()
+        // self.ptr.deref().borrow().val().clone()
+        unsafe { self.ptr.try_borrow_unguarded().unwrap().val().clone() }
     }
 
     pub fn grad(&self) -> Option<T> {
-        self.ptr.deref().borrow().grad().clone()
+        // self.ptr.deref().borrow().grad().clone()
+        unsafe { self.ptr.try_borrow_unguarded().unwrap().grad().clone() }
     }
 
-    pub fn set_grad(&mut self, new_grad: T) {
+    pub fn set_grad(&self, new_grad: T) {
         self.ptr.deref().borrow_mut().deref_mut().set_grad(new_grad)
     }
 
@@ -54,7 +56,7 @@ impl<T: RealElement + From<f64>> Node<T> {
         self.ptr.deref().borrow_mut().deref_mut().set_val(new_val)
     }
 
-    pub fn add_assign_grad(&mut self, new_grad: T) {
+    pub fn add_assign_grad(&self, new_grad: T) {
         match self.grad() {
             Some(grad) => self.set_grad(grad + new_grad),
             None => self.set_grad(new_grad),
@@ -64,39 +66,41 @@ impl<T: RealElement + From<f64>> Node<T> {
     // Set the gradient and initiate backward propagation.
     // Propagate a given gradient on the `grad` of each associated Node.
     // Assumes the `grad` on self is not None.
-    pub fn backward(&mut self, grad: T) {
+    // pub fn backward(&mut self, grad: T) {
+    pub fn backward(&self, grad: T) {
         let self_val = self.val();
 
-        // let node_content_ref = self.ptr.as_ref().borrow().deref();
-        match self.ptr.as_ref().borrow_mut().deref_mut() {
-            NodeContent::Sum(_, _, (ref mut np1, ref mut np2)) => {
+        // match self.ptr.borrow_mut().deref_mut() {
+        let mut leaf = false;
+        match unsafe { self.ptr.try_borrow_unguarded().unwrap() } {
+            NodeContent::Sum(_, _, (np1, np2)) => {
                 np1.backward(grad.clone());
                 np2.backward(grad.clone());
             }
-            NodeContent::Prod(_, _, (ref mut np1, ref mut np2)) => {
+            NodeContent::Prod(_, _, (np1, np2)) => {
                 let np1_grad = np2.val().to_owned() * grad.clone();
                 let np2_grad = np1.val().to_owned() * grad.clone();
                 np1.backward(np1_grad);
                 np2.backward(np2_grad);
             }
-            NodeContent::Quot(_, _, (ref mut np_num, ref mut np_denom)) => {
+            NodeContent::Quot(_, _, (np_num, np_denom)) => {
                 let minus_one = <f64 as Into<T>>::into(-1_f64);
                 let two = <f64 as Into<T>>::into(2_f64);
                 let np_num_grad = grad.clone() / np_denom.val().to_owned();
-                let np_denom_grad =
-                    minus_one * grad.clone() * np_num.val().to_owned() / np_denom.val().to_owned().pow(two);
+                let np_denom_grad = minus_one * grad.clone() * np_num.val().to_owned()
+                    / np_denom.val().to_owned().pow(two);
                 np_num.backward(np_num_grad);
                 np_denom.backward(np_denom_grad);
             }
-            NodeContent::Exp(_, _, ref mut np) => {
+            NodeContent::Exp(_, _, np) => {
                 let np_grad = grad.clone() * self_val;
                 np.backward(np_grad);
             }
-            NodeContent::Ln(_, _, ref mut np) => {
+            NodeContent::Ln(_, _, np) => {
                 let np_grad = grad.clone() * <f64 as Into<T>>::into(1_f64) / np.val();
                 np.backward(np_grad);
             }
-            NodeContent::Pow(_, _, (ref mut np_b, ref mut np_e)) => {
+            NodeContent::Pow(_, _, (np_b, np_e)) => {
                 // exponent . base^(exponent - 1)
                 let b_val = np_b.val().clone();
                 let e_val = np_e.val().clone();
@@ -110,9 +114,12 @@ impl<T: RealElement + From<f64>> Node<T> {
                 np_b.backward(np_b_grad);
                 np_e.backward(np_e_grad);
             }
-            NodeContent::Leaf(_, _) => {} // Do nothing.
+            NodeContent::Leaf(_, _) => leaf = true, // Do nothing.
         }
-        self.add_assign_grad(grad.clone());
+        if leaf {
+            self.add_assign_grad(grad.clone());
+        }
+        // self.add_assign_grad(grad.clone());
     }
 }
 
@@ -840,14 +847,15 @@ mod tests {
         let b2 = Node::new(val_b, None);
         let c2 = Node::new(val_c, None);
         let d2 = Node::new(val_d, None);
-        let mut result2 = a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
+        let mut result2 =
+            a2.clone() + a2.clone() + b2.clone() + b2.clone() + c2.clone() + d2.clone();
         result2.backward(1.0);
         let grad_a2 = a2.grad().unwrap();
         let grad_b2 = b2.grad().unwrap();
         let grad_c2 = c2.grad().unwrap();
         let grad_d2 = d2.grad().unwrap();
         assert!(f64::abs(result1.val() - result2.val()) < 1e-10);
-        assert!(f64::abs(result1.val() - (2.0*val_a + 2.0*val_b + val_c + val_d)) < 1e-10);
+        assert!(f64::abs(result1.val() - (2.0 * val_a + 2.0 * val_b + val_c + val_d)) < 1e-10);
         assert_eq!(grad_a1, grad_a2);
         assert_eq!(grad_a1, 2.0);
         assert_eq!(grad_b1, grad_b2);

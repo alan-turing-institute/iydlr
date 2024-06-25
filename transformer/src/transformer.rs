@@ -72,7 +72,7 @@ where
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
-        Ok(self.model.forward(x)?.softmax(2))
+        Ok(self.model.forward(x)?)
     }
 
     fn params(&self) -> Vec<E> {

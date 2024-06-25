@@ -68,17 +68,18 @@ where
         // and the second linear layer projects back to the original embedding dimension.
 
         // TODO: implement residual connections
-        println!("{}", "-".repeat(10));
+        // println!("{}", "-".repeat(10));
         let att: T = self.self_attention.forward(x).unwrap(); // in: (B x T x C), out: (B x T x C)
         let residual1: T = att.clone() + x.clone(); // in: (B x T x C), out: (B x T x C)
         let normed_res1: T = self.norm_layer.forward(&residual1).unwrap();
-        println!("{}", "*".repeat(10));
+        // println!("{}", "*".repeat(10));
         let lin: T = self.linear_layer1.forward(&normed_res1).unwrap(); // in: (B x T x C), out: (B x T x 4C)
         let act: T = self.activation_layer.forward(&lin).unwrap(); // in: (B x T x 4C), out: (B x T x 4C)
-        let lin2: T = self.linear_layer2.forward(&act).unwrap(); // in: (B x T x 4C), out: (B x T x C)
-        let residual2: T = lin2.clone() + residual1.clone(); // in: (B x T x C), out: (B x T x C)
+                                                                   // let lin2: T = self.linear_layer2.forward(&act).unwrap(); // in: (B x T x 4C), out: (B x T x C)
+                                                                   // let residual2: T = lin2.clone() + residual1.clone(); // in: (B x T x C), out: (B x T x C)
+        let residual2: T = act.clone() + residual1.clone(); // in: (B x T x C), out: (B x T x C)
         let normed_res2: T = self.norm_layer.forward(&residual2).unwrap();
-        println!("{}", "-".repeat(10));
+        // println!("{}", "-".repeat(10));
         Ok(normed_res2) // (B x T x C)
     }
 
@@ -103,7 +104,8 @@ impl Block<La, Mal, Te, El, ActLayer<Te, El>, NormLayer<Te, El>> {
     pub fn new(config: &Config, is_masked: bool) -> Self {
         let self_attention = MultiHeadAttention::new(config, is_masked);
         // Residual connection: add embedding matrix X to the output of the sub-layer element-wise
-        let linear_layer1 = LinLayer::new(config.embed_dim, 4 * config.embed_dim, config.seed);
+        // let linear_layer1 = LinLayer::new(config.embed_dim, 4 * config.embed_dim, config.seed);
+        let linear_layer1 = LinLayer::new(config.embed_dim, config.embed_dim, config.seed);
         let activation_layer = ActLayer::new();
         let linear_layer2 = LinLayer::new(4 * config.embed_dim, config.embed_dim, config.seed);
         let norm_layer = NormLayer::new();

@@ -4,28 +4,33 @@ use interfaces::deep_learning::DLModule;
 use interfaces::tensors::{RealTensor, Tensor};
 use neural_nets::optim::{bce, cce, OptimSGD};
 use tokenisation::batch_generator::BatchGenerator;
+use tokenisation::tokeniser::Tokeniser;
 use transformer::transformer::Transformer;
 
+const TEXT: &str = "hellotransformer";
+
 fn get_config() -> Config {
+    let tokeniser = Tokeniser::new(TEXT);
+    let vocab_size = tokeniser.vocab_size();
     Config {
         batch_size: 1,
-        seq_len: 8,
-        embed_dim: 8,
+        seq_len: 2,
+        embed_dim: 4,
         // Currently this must be set as the same as the input text
-        vocab_size: 12,
-        num_head: 4,
-        num_blocks: 4,
+        vocab_size,
+        num_head: 1,
+        num_blocks: 1,
         seed: 0,
     }
 }
 
 #[test]
 fn transformer_test() {
-    let max_itr = 300;
-    let config = &get_config();
-    let model = Transformer::new(config);
+    let max_itr = 1;
+    let config = get_config();
+    let model = Transformer::new(&config);
     let mut batch_gen = BatchGenerator::new(
-        "hellotransformer".to_string(),
+        TEXT.to_string(),
         config.seq_len,
         config.batch_size,
         config.seed,
@@ -48,6 +53,14 @@ fn transformer_test() {
         println!(
             "{:?}",
             pred_vec
+                .into_iter()
+                .map(|node| node.val())
+                .collect::<Vec<_>>()
+        );
+        let loss = cce(&y, &pred);
+        println!(
+            "loss: {:?}",
+            loss.clone()
                 .into_iter()
                 .map(|node| node.val())
                 .collect::<Vec<_>>()

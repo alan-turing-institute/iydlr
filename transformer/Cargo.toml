@@ -3,6 +3,10 @@ name = "transformer"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "training"
+path = "src/bin/training.rs"
+
 [dependencies]
 attention = { version = "0.1.0", path = "../attention" }
 autodiff = { version = "0.1.0", path = "../autodiff" }
