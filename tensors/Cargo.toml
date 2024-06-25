@@ -5,7 +5,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
-interfaces = {path = "../interfaces"}
+interfaces = { path = "../interfaces" }
+num-traits = "0.2.19"
 
 [dev-dependencies]
 rand = "0.8.5"
+num-traits = "0.2.19"

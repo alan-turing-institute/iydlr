@@ -10,11 +10,34 @@ use neural_nets::{
 use tensors::TensorImpl;
 
 #[test]
+fn nn_test() {
+    let seed = 0;
+    let model = Serial::<Node<TensorImpl<f64>>, f64>::new(vec![
+        Box::new(LinLayer::new(2, 5, seed)),
+        Box::new(ActLayer::new()),
+    ]);
+    let params = model.params();
+    let x = TensorImpl::from_vec(&vec![1, 1, 2], &vec![2.0, 3.0]).unwrap();
+    let mut pred = model.forward(&x.into()).unwrap();
+    println!("\npred: {:?}\n", pred.val());
+    pred.backward(TensorImpl::fill_with_clone(pred.shape(), 1.0));
+
+    assert_eq!(
+        params[0].clone().grad().clone().unwrap().get_data(),
+        &vec![2., 2., 2., 2., 0., 3., 3., 3., 3., 0.]
+    );
+    assert_eq!(
+        params[1].clone().grad().clone().unwrap().get_data(),
+        &vec![1., 1., 1., 1., 0.]
+    );
+}
+
+#[test]
 fn xor_test() {
     let seed = 2;
     let max_itr = 300;
     let batch_size = 5;
-    let model: Serial<TensorImpl<Node<f64>>, Node<f64>> = Serial::new(vec![
+    let model = Serial::<Node<TensorImpl<f64>>, f64>::new(vec![
         Box::new(LinLayer::new(2, 5, seed)),
         Box::new(ActLayer::new()),
         Box::new(LinLayer::new(5, 10, seed)),
@@ -29,40 +52,39 @@ fn xor_test() {
     let mut optim = OptimSGD::new(0.01, max_itr, model.params());
 
     for itr in 0..max_itr {
-        let (x, y) = xor_gen.next().unwrap();
+        let (x, y): (TensorImpl<f64>, Vec<f64>) = xor_gen.next().unwrap();
         let y_tensor = TensorImpl::from_vec(&vec![1, batch_size, 1], &y).unwrap();
-        let pred = model.forward(&x).unwrap();
+        let pred = model.forward(&x.into()).unwrap();
         let soft = pred.softmax(2);
         let class_0 = soft
             .matmul(
-                &TensorImpl::from_vec(&vec![2, 1], &vec![Node::from(1.0), Node::from(0.0)])
-                    .unwrap(),
+                &TensorImpl::from_vec(&vec![2, 1], &vec![1.0, 0.0])
+                    .unwrap()
+                    .into(),
             )
             .unwrap();
 
-        let loss_tensor = bce(y_tensor, class_0);
+        let loss_tensor = bce(y_tensor.into(), class_0);
+        // sum loss over batch
         let loss = loss_tensor.dim_sum(vec![1]);
 
-        println!(
-            "loss: {:?}",
-            loss.clone()
-                .into_iter()
-                .map(|node| node.val())
-                .collect::<Vec<_>>()
-        );
+        println!("loss: {:?}", loss.clone().into_iter().collect::<Vec<_>>());
 
         optim.zero_grad();
-        loss.at(vec![0, 0, 0]).unwrap().clone().backward(1.0);
+        loss.clone()
+            .backward(TensorImpl::fill_with_clone(loss.shape(), 1.0));
         optim.update(itr);
     }
     let (x, y) = xor_gen.next().unwrap();
     let y_tensor = TensorImpl::from_vec(&vec![1, batch_size, 1], &y).unwrap();
     // shape (1,B,1)
-    let pred = model.forward(&x).unwrap();
+    let pred = model.forward(&x.into()).unwrap();
     let soft = pred.softmax(2);
     let class_0 = soft
         .matmul(
-            &TensorImpl::from_vec(&vec![2, 1], &vec![Node::from(1.0), Node::from(0.0)]).unwrap(),
+            &TensorImpl::from_vec(&vec![2, 1], &vec![1.0, 0.0])
+                .unwrap()
+                .into(),
         )
         .unwrap();
     println!(
@@ -70,7 +92,7 @@ fn xor_test() {
         class_0
             .clone()
             .into_iter()
-            .map(|node| node.val())
+            // .map(|node| node.val())
             .collect::<Vec<_>>()
     );
     println!(
@@ -78,11 +100,12 @@ fn xor_test() {
         y_tensor
             .clone()
             .into_iter()
-            .map(|node| node.val())
+            // .map(|node| node.val())
             .collect::<Vec<_>>()
     );
 
-    let loss_tensor = bce(y_tensor, class_0);
+    let loss_tensor = bce(y_tensor.into(), class_0);
     let loss = loss_tensor.dim_sum(vec![1]);
-    assert!(loss.at(vec![0, 0, 0]).unwrap().clone().val() < 0.1_f64)
+
+    assert!(loss.val().get_data()[0] < 0.1_f64)
 }

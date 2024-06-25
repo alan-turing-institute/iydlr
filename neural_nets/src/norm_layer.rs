@@ -65,7 +65,7 @@ where
     }
 
     // The activation layer has no parameters, return an empty vector
-    fn params(&self) -> Vec<E> {
+    fn params(&self) -> Vec<T> {
         Vec::new()
     }
 }

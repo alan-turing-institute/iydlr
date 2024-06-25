@@ -14,7 +14,7 @@ pub struct ActLayer<T: Tensor<E>, E: Element> {
 impl<T, E> DLModule<T, E> for ActLayer<T, E>
 where
     T: Tensor<E>,
-    E: Element + Into<f64>,
+    E: Element + Into<f64> + From<f64>,
 {
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
@@ -27,17 +27,23 @@ where
             );
         } else {
             // The activation function is the ReLU function
-            let relu: Vec<_> = x
+            let relu_mask: Vec<_> = x
                 .clone()
                 .into_iter()
-                .map(|x| if x.clone().into() > 0.0 { x } else { E::zero() })
+                .map(|x| {
+                    if x.clone().into() > 0.0 {
+                        1.0.into()
+                    } else {
+                        E::zero()
+                    }
+                })
                 .collect();
-            return Ok(T::from_vec(&input_shape, &relu)?);
+            return Ok(T::from_vec(&x.shape(), &relu_mask).unwrap() * x);
         }
     }
 
     // The activation layer has no parameters, return an empty vector
-    fn params(&self) -> Vec<E> {
+    fn params(&self) -> Vec<T> {
         Vec::new()
     }
 }
@@ -45,7 +51,7 @@ where
 impl<T, E> ActivationLayer<T, E> for ActLayer<T, E>
 where
     T: Tensor<E>,
-    E: Element + Into<f64>,
+    E: Element + Into<f64> + From<f64>,
 {
 }
 

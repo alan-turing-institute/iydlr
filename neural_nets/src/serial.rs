@@ -26,7 +26,7 @@ where
         Ok(tmp.clone())
     }
 
-    fn params(&self) -> Vec<E> {
+    fn params(&self) -> Vec<T> {
         self.modules.iter().fold(Vec::new(), |mut acc, module| {
             acc.extend(module.params());
             acc
@@ -82,6 +82,6 @@ mod tests {
             Box::new(LinLayer::new(3, 1, seed)),
         ]);
         // w1 + b1 + w2 + b2
-        assert_eq!(serial.params().len(), 3 + 3 + 3 + 1);
+        assert_eq!(serial.params().len(), 4);
     }
 }

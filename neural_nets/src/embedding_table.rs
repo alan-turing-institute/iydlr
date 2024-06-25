@@ -43,8 +43,8 @@ where
 
         Ok(one_hot_tensor.matmul(&self.table)?)
     }
-    fn params(&self) -> Vec<E> {
-        self.table.clone().into()
+    fn params(&self) -> Vec<T> {
+        vec![self.table.clone()]
     }
 }
 
