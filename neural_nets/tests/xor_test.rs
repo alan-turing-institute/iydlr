@@ -1,5 +1,3 @@
-use std::iter::zip;
-
 use autodiff::node::Node;
 use interfaces::deep_learning::DLModule;
 use interfaces::tensors::RealTensor;

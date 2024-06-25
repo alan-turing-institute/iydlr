@@ -3,10 +3,7 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign},
 };
 
-use interfaces::{
-    tensors::{Element, RealElement},
-    utils::{Exp, Ln, Pow},
-};
+use interfaces::utils::{Exp, Ln, Pow};
 use num_traits::identities::Zero;
 
 #[derive(Debug, Clone, Copy, PartialEq)]

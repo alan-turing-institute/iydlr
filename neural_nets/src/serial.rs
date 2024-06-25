@@ -51,7 +51,6 @@ mod tests {
     use crate::lin_layer::LinLayer;
 
     use super::*;
-    use rand::seq;
     use tensors::TensorImpl;
 
     #[test]

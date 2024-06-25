@@ -70,7 +70,7 @@ mod tests {
     #[test]
     fn construct_act_layer() {
         // The activation layer is constructed without any errors
-        let layer: ActLayer<TensorImpl<f64>, f64> = ActLayer::new();
+        let _layer: ActLayer<TensorImpl<f64>, f64> = ActLayer::new();
     }
 
     #[test]

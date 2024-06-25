@@ -1,7 +1,6 @@
 use num::traits::Zero;
 use std::{
     cmp::{PartialEq, PartialOrd},
-    error::Error,
     fmt::{Debug, Display},
     ops::{Add, AddAssign, Div, Mul, Sub},
 };

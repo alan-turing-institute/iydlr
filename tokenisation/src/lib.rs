@@ -19,11 +19,11 @@ pub fn main() {
     //println!("{}", story);
     //println!("First 1000 characters: {}", first_thou);
     let story: String = read_txt("my_text.txt");
-    let punc_chars = [
+    let _punc_chars = [
         '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', ':', ';', '<',
         '=', '>', '?', '@', '[', '\\', ']', '^', '_', '`', '{', '|', '}', '~', ' ',
     ];
-    let first_thou: String = story.chars().take(1000).collect();
+    let _first_thou: String = story.chars().take(1000).collect();
     // println!("{:?}", story.chars().take(10).collect::<Vec<_>>());
 
     println!("Number of characters: {}", story.chars().count());

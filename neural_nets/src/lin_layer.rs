@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn construct_lin_layer() {
-        let layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 1, 0);
+        let _layer: LinLayer<TensorImpl<f64>, f64> = LinLayer::new(2, 1, 0);
     }
 
     #[test]

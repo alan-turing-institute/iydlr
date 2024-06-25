@@ -9,8 +9,8 @@ use tensors::TensorImpl;
 // Making a batch generator
 pub struct BatchGenerator {
     rng: ChaCha8Rng,
-    text: String,
-    tokeniser: Tokeniser,
+    _text: String,
+    _tokeniser: Tokeniser,
     tokens: Vec<usize>,
     chunk_len: usize,
     batch_size: usize,
@@ -25,8 +25,8 @@ impl BatchGenerator {
         let vocab_size = tokeniser.vocab_size();
         BatchGenerator {
             rng,
-            text,
-            tokeniser,
+            _text: text,
+            _tokeniser: tokeniser,
             tokens,
             chunk_len,
             batch_size,
@@ -106,6 +106,6 @@ mod tests {
         let batch_size = 1;
         let mut batch_gen = BatchGenerator::new(text, chunk_len, batch_size, seed);
 
-        let (x, y) = batch_gen.sample_batch();
+        let (_, _) = batch_gen.sample_batch();
     }
 }
