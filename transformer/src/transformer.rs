@@ -3,13 +3,12 @@ use attention::attention::SelfAttention;
 use attention::attention::{El, La, Mal, Te};
 use config::Config;
 use embeddings::pos_encoding::PELayer;
+use interfaces::deep_learning::LinearLayer;
 use interfaces::deep_learning::{ActivationLayer, DLModule};
-use interfaces::deep_learning::{EmbeddingLayer, LinearLayer};
 use interfaces::tensors::{RealElement, RealTensor, Tensor};
 use neural_nets::embedding_table::EmbeddingTable;
 use neural_nets::norm_layer::NormLayer;
 use neural_nets::{act_layer::ActLayer, lin_layer::LinLayer, serial::Serial};
-use std::default::Default;
 use std::marker::PhantomData;
 
 pub struct Transformer<L, A, T, E, Al, N>
@@ -72,7 +71,7 @@ where
     type DLModuleError = <T as Tensor<E>>::TensorError;
 
     fn forward(&self, x: &T) -> Result<T, Self::DLModuleError> {
-        Ok(self.model.forward(x)?.softmax(2))
+        Ok(self.model.forward(x)?)
     }
 
     fn params(&self) -> Vec<E> {

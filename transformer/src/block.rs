@@ -6,7 +6,7 @@ use interfaces::{
     tensors::{RealElement, Tensor},
 };
 
-use neural_nets::norm_layer::{self, NormLayer};
+use neural_nets::norm_layer::NormLayer;
 use neural_nets::{act_layer::ActLayer, lin_layer::LinLayer};
 use std::marker::PhantomData;
 
@@ -53,7 +53,7 @@ where
     L: LinearLayer<T, E>,
     A: SelfAttention<T, E>,
     T: Tensor<E>,
-    E: RealElement,
+    E: RealElement + Into<f64>,
     Al: ActivationLayer<T, E>,
     N: LinearLayer<T, E>,
 {
@@ -79,6 +79,11 @@ where
         let residual2: T = lin2.clone() + residual1.clone(); // in: (B x T x C), out: (B x T x C)
         let normed_res2: T = self.norm_layer.forward(&residual2).unwrap();
         println!("{}", "-".repeat(10));
+        let r_vec: Vec<E> = normed_res2.clone().into();
+        println!(
+            "{:?}",
+            r_vec.into_iter().map(|el| el.into()).collect::<Vec<f64>>()
+        );
         Ok(normed_res2) // (B x T x C)
     }
 

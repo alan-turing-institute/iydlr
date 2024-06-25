@@ -75,14 +75,30 @@ where
     result * t_negative_ones
 }
 
-pub fn my_cce<T, E>(y: &T, y_pred: &T) -> T
+/// Adapted from https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html#torch.nn.CrossEntropyLoss
+/// expects target indicies: (B,T,C), one hots
+/// expects y_pred: (B,T,C) logits (not probabilities!)
+pub fn torch_cce<T, E>(target: &T, y_pred: &T) -> T
 where
     T: RealTensor<E>,
     E: RealElement + From<f64>,
 {
-    (((y_pred.clone() * y.clone()).dim_sum(vec![2]) * E::from(-1.0))
-        + (y_pred.clone().exp().dim_sum(vec![2]) + E::from(0.0000001)).ln())
-    .dim_sum(vec![1])
+    // ensure elementwise * does not broadcast
+    assert_eq!(y_pred.shape(), target.shape());
+
+    // B,T
+    let numerator = (y_pred.clone() * target.clone()).dim_sum(vec![2]).exp();
+
+    // B,T
+    let denominator = y_pred.clone().exp().dim_sum(vec![2]);
+
+    // B,T
+    let likelihood = numerator / (denominator + E::from(f64::EPSILON));
+
+    // B,T
+    let loss = (likelihood + E::from(f64::EPSILON)).ln() * E::from(-1.0);
+
+    loss
 }
 
 #[cfg(test)]
@@ -93,11 +109,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn my_cce_vs_cce() {
+    fn torch_cce_vs_cce() {
         let x =
             TensorImpl::from_vec(&vec![1, 2, 3], &vec![0.05, 0.95, 0.0, 0.1, 0.8, 0.1]).unwrap();
         let y = TensorImpl::from_vec(&vec![1, 2, 3], &vec![0.0, 1.0, 0.0, 0.0, 0.0, 1.0]).unwrap();
-        println!("my: {:?}", my_cce(&y, &x));
+        println!("my: {:?}", torch_cce(&y, &x));
         println!("cce: {:?}", cce(&y, &x));
     }
 
