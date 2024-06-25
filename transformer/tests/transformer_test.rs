@@ -1,18 +1,17 @@
-use attention::attention::{El, Te};
 use config::Config;
 use interfaces::deep_learning::DLModule;
-use interfaces::tensors::{RealTensor, Tensor};
-use neural_nets::optim::{bce, cce, OptimSGD};
+use interfaces::tensors::Tensor;
+use neural_nets::optim::{torch_cce, OptimSGD};
 use tokenisation::batch_generator::BatchGenerator;
 use transformer::transformer::Transformer;
 
 fn get_config() -> Config {
     Config {
-        batch_size: 1,
-        seq_len: 8,
-        embed_dim: 8,
+        batch_size: 2,
+        seq_len: 4,
+        embed_dim: 4,
         // Currently this must be set as the same as the input text
-        vocab_size: 12,
+        vocab_size: 11,
         num_head: 4,
         num_blocks: 4,
         seed: 0,
@@ -21,7 +20,7 @@ fn get_config() -> Config {
 
 #[test]
 fn transformer_test() {
-    let max_itr = 300;
+    let max_itr = 2;
     let config = &get_config();
     let model = Transformer::new(config);
     let mut batch_gen = BatchGenerator::new(
@@ -52,20 +51,25 @@ fn transformer_test() {
                 .map(|node| node.val())
                 .collect::<Vec<_>>()
         );
-        // let loss = cce(&y, &pred);
-        // println!(
-        //     "loss: {:?}",
-        //     loss.clone()
-        //         .into_iter()
-        //         .map(|node| node.val())
-        //         .collect::<Vec<_>>()
-        // );
+        let loss = torch_cce(&y, &pred);
+        println!(
+            "loss ({:?}): {:?}",
+            loss.shape(),
+            loss.clone()
+                .into_iter()
+                .map(|node| node.val())
+                .collect::<Vec<_>>()
+        );
 
-        // optim.zero_grad();
-        // println!("Backward...");
-        // loss.at(vec![0, 0, 0]).unwrap().clone().backward(1.0);
-        // optim.update(itr);
-        // println!("Updated optim...");
+        optim.zero_grad();
+        println!("Backward...");
+        loss.dim_sum(vec![0, 1])
+            .at(vec![0, 0, 0])
+            .unwrap()
+            .clone()
+            .backward(1.0);
+        optim.update(itr);
+        println!("Updated optim...");
     }
 
     // shape (1,B,1)
