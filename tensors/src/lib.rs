@@ -123,7 +123,6 @@ impl<E: Element> TensorImpl<E> {
         });
     }
 
-
     pub fn elementwise_binary_op(self, other: Self, op: fn(E, E) -> E) -> Self {
         if self.shape() == other.shape() {
             return self.elementwise_binary_op_same_shape(other, op);
@@ -265,6 +264,22 @@ impl<E: Element> Add<E> for TensorImpl<E> {
             .iter()
             // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
             .map(|a| a.clone() + scalar.clone())
+            .collect();
+        // TODO: Remove the unwrap, and return a Result instead
+        TensorImpl::from_vec(&self.shape(), &data).unwrap()
+    }
+}
+
+/// Adding to a scalar to a tensors together.
+impl<E: Element> Sub<E> for TensorImpl<E> {
+    type Output = Self;
+
+    fn sub(self, scalar: E) -> Self {
+        let data: Vec<E> = self
+            .data
+            .iter()
+            // TODO(mhauru) What's the consequence of cloning here? Does it affect performance?
+            .map(|a| a.clone() - scalar.clone())
             .collect();
         // TODO: Remove the unwrap, and return a Result instead
         TensorImpl::from_vec(&self.shape(), &data).unwrap()
@@ -477,7 +492,6 @@ where
         self.data.as_ref()
     }
 
-
     // TODO (asmith) There is loads of copy-and-paste code from the
     // `single_dim_sum` method. Ideally this should be refactored
     pub fn slice(&self, dim: usize, idx: usize) -> Result<Self, &str> {
@@ -488,7 +502,6 @@ where
         if idx >= self.shape[dim] {
             return Err("The provided index is out of bounds.");
         }
-
 
         let leading_dims = self.shape.iter().take(dim).into_iter().product::<usize>();
         let trailing_dims = self
@@ -504,7 +517,6 @@ where
 
         let mut output_shape = self.shape.clone();
         output_shape[dim] = 1;
-
 
         let mut slice: Vec<E> = Vec::new();
 
@@ -525,7 +537,6 @@ where
         // println!("output_shape: {:?}", output_shape);
         // println!("slice: {:?}", slice);
         Ok(TensorImpl::from_vec(&output_shape, &slice).unwrap())
-
     }
 
     ///// Sum across a single dimensions (eg. row-wise sum for a 2D matrix resulting in a "column
@@ -607,10 +618,16 @@ impl<E: RealElement> Ln for TensorImpl<E> {
 
 impl<E: RealElement> RealTensor<E> for TensorImpl<E> {
     fn softmax(&self, dim: usize) -> Self {
-        let data_exp = self.clone().exp();
+        let t_small = E::from(f64::EPSILON);
+        let max = self
+            .data
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        let data_exp = (self.clone() - max.clone()).exp();
         let data_sum = data_exp.dim_sum(vec![dim]);
 
-        let new_data = data_exp / data_sum;
+        let new_data = data_exp / (data_sum + t_small);
         TensorImpl {
             shape: self.shape.clone(),
             data: new_data.data,
@@ -996,10 +1013,13 @@ mod tests {
             let shape = vec![2, 2];
             let data = vec![1, 2, 3, 4];
             let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
-    
+
             let slice = tensor.slice(5, 1);
             assert!(slice.is_err());
-            assert_eq!(slice.err(), Some("The provided dimension is out of bounds."));
+            assert_eq!(
+                slice.err(),
+                Some("The provided dimension is out of bounds.")
+            );
         }
 
         // Test idx is too large
@@ -1007,7 +1027,6 @@ mod tests {
             let shape = vec![2, 2];
             let data = vec![1, 2, 3, 4];
             let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
-    
             let slice = tensor.slice(1, 5);
             assert!(slice.is_err());
             assert_eq!(slice.err(), Some("The provided index is out of bounds."));
@@ -1018,7 +1037,7 @@ mod tests {
         let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
         let tensor = TensorImpl::from_vec(&shape, &data).unwrap();
 
-        let maybe_slice = tensor.slice(2,1);
+        let maybe_slice = tensor.slice(2, 1);
         let expected_shape = vec![2, 2, 1];
         let expected_data = vec![2, 4, 6, 8];
 
